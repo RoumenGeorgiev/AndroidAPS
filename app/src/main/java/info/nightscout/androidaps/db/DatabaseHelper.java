@@ -689,7 +689,8 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
             treatment.insulin = trJson.has("insulin") ? trJson.getDouble("insulin") : 0d;
             treatment.pumpId = trJson.has("pumpId") ? trJson.getLong("pumpId") : 0;
             treatment._id = trJson.getString("_id");
-            treatment.isSMB = trJson.getBoolean("isSMB");
+            if (trJson.has("isSMB"))
+                treatment.isSMB = trJson.getBoolean("isSMB");
             if (trJson.has("eventType")) {
                 treatment.mealBolus = !trJson.get("eventType").equals("Correction Bolus");
                 double carbs = treatment.carbs;
@@ -949,6 +950,10 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
             if (tempBasal.source == Source.NIGHTSCOUT) {
                 old = getDaoTemporaryBasal().queryForId(tempBasal.date);
                 if (old != null) {
+                    if (!old.isAbsolute && tempBasal.isAbsolute) { // converted to absolute by "ns_sync_use_absolute"
+                        // so far ignore, do not convert back because it may not be accurate
+                        return false;
+                    }
                     if (!old.isEqual(tempBasal)) {
                         long oldDate = old.date;
                         getDaoTemporaryBasal().delete(old); // need to delete/create because date may change too
@@ -1267,6 +1272,7 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
             scheduleExtendedBolusChange();
         }
     }
+
     public ExtendedBolus findExtendedBolusById(String _id) {
         try {
             QueryBuilder<ExtendedBolus, Long> queryBuilder = null;
