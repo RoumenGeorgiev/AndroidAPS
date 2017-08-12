@@ -166,7 +166,8 @@ public class Notification {
         //bgReadingAgoMin = 20;
         log.debug("bgReadingAgoMin value is:"+bgReadingAgoMin);
         Double threshold = NSSettingsStatus.getInstance().getThreshold("alarmTimeagoWarnMins");
-		boolean openAPSEnabledAlerts = NSSettingsStatus.getInstance().openAPSEnabledAlerts();
+	       	boolean openAPSEnabledAlerts = false;
+	    	if(NSSettingsStatus.getInstance().openAPSEnabledAlerts() != null) openAPSEnabledAlerts = NSSettingsStatus.getInstance().openAPSEnabledAlerts();
 		log.debug("OpenAPS Alerts enabled: "+openAPSEnabledAlerts);
 		// if no thresshold from Ns get it loccally
         if(threshold == null) threshold = SP.getDouble(R.string.key_nsalarm_staledatavalue,15D);
