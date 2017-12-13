@@ -17,6 +17,7 @@ import info.nightscout.androidaps.plugins.NSClientInternal.data.NSSgv;
 import info.nightscout.androidaps.plugins.Overview.OverviewPlugin;
 import info.nightscout.androidaps.plugins.Overview.graphExtensions.DataPointWithLabelInterface;
 import info.nightscout.androidaps.plugins.Overview.graphExtensions.PointsWithLabelGraphSeries;
+import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.SP;
 
@@ -42,9 +43,7 @@ public class BgReading implements DataPointWithLabelInterface {
     @DatabaseField
     public String _id = null; // NS _id
 
-    public boolean isCOBPrediction = false; // true when drawing predictions as bg points (COB)
-    public boolean isaCOBPrediction = false; // true when drawing predictions as bg points (aCOB)
-    public boolean isIOBPrediction = false; // true when drawing predictions as bg points (IOB)
+    public boolean isPrediction = false; // true when drawing predictions as bg points
 
     public BgReading() {
     }
@@ -184,10 +183,7 @@ public class BgReading implements DataPointWithLabelInterface {
 
     @Override
     public PointsWithLabelGraphSeries.Shape getShape() {
-        if (isPrediction())
-            return PointsWithLabelGraphSeries.Shape.PREDICTION;
-        else
-            return PointsWithLabelGraphSeries.Shape.BG;
+        return PointsWithLabelGraphSeries.Shape.BG;
     }
 
     @Override
@@ -208,29 +204,13 @@ public class BgReading implements DataPointWithLabelInterface {
             highLine = Profile.fromMgdlToUnits(OverviewPlugin.bgTargetHigh, units);
         }
         int color = MainApp.sResources.getColor(R.color.inrange);
-        if (isPrediction())
+        if (isPrediction)
             color = MainApp.sResources.getColor(R.color.prediction);
         else if (valueToUnits(units) < lowLine)
             color = MainApp.sResources.getColor(R.color.low);
         else if (valueToUnits(units) > highLine)
             color = MainApp.sResources.getColor(R.color.high);
         return color;
-    }
-
-    @Override
-    public int getSecondColor() {
-        if (isIOBPrediction)
-            return MainApp.sResources.getColor(R.color.iob);
-        if (isCOBPrediction)
-            return MainApp.sResources.getColor(R.color.cob);
-        if (isaCOBPrediction)
-            return 0x80FFFFFF & MainApp.sResources.getColor(R.color.cob);
-
-        return R.color.mdtp_white;
-    }
-
-    private boolean isPrediction() {
-        return isaCOBPrediction || isCOBPrediction || isIOBPrediction || isUAMPrediction;
     }
 
 }
