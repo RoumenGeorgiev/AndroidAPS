@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        android:key="assistant"
+        android:title="Google Assistant settings">
+
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="assistant_enabled"
+            android:title="Enable Google assistant help?"
+            android:summary="Do you want any of this?"/>
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="assistant_bolus"
+            android:title="Bolussing allowed?"
+            android:summary="Should bolusing via voice be allowed?"/>
+    </PreferenceCategory>
+
+</PreferenceScreen>

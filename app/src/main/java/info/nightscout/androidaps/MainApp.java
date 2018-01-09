@@ -33,6 +33,7 @@ import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.ConstraintsObjectives.ObjectivesPlugin;
 import info.nightscout.androidaps.plugins.ConstraintsSafety.SafetyPlugin;
 import info.nightscout.androidaps.plugins.Food.FoodPlugin;
+import info.nightscout.androidaps.plugins.GoogleAssistant.GoogleAssistantPlugin;
 import info.nightscout.androidaps.plugins.Insulin.InsulinFastactingPlugin;
 import info.nightscout.androidaps.plugins.Insulin.InsulinFastactingProlongedPlugin;
 import info.nightscout.androidaps.plugins.Insulin.InsulinOrefFreePeakPlugin;
@@ -124,6 +125,7 @@ public class MainApp extends Application {
             pluginsList.add(SensitivityOref0Plugin.getPlugin());
             pluginsList.add(SensitivityAAPSPlugin.getPlugin());
             pluginsList.add(SensitivityWeightedAveragePlugin.getPlugin());
+            pluginsList.add(GoogleAssistantPlugin.getPlugin());
             if (Config.DANAR) pluginsList.add(DanaRPlugin.getPlugin());
             if (Config.DANAR) pluginsList.add(DanaRKoreanPlugin.getPlugin());
             if (Config.DANAR) pluginsList.add(DanaRv2Plugin.getPlugin());
@@ -157,6 +159,7 @@ public class MainApp extends Application {
 
             pluginsList.add(WearPlugin.initPlugin(this));
             pluginsList.add(StatuslinePlugin.initPlugin(this));
+            //pluginsList.add(GoogleAssistantPlugin.initPlugin(this));
             pluginsList.add(new PersistentNotificationPlugin(this));
             pluginsList.add(NSClientInternalPlugin.getPlugin());
 
