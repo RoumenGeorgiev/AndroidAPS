@@ -183,6 +183,8 @@ public class GoogleAssistantPlugin implements PluginBase {
                     log.debug("Assistant: is equal to token " + treatment.getString("notes").toString().equals(this.tokens[0]));
                     updateTokens();
                     log.debug("Assistant: tokens updated: "+ getTokens());
+                    // Adding to last command
+                    SP.putString("assistantLastCommand", treatment.toString());
                     //remove from NS
                     final String _id = treatment.getString("_id");
                     if (NSUpload.isIdValid(_id)) {

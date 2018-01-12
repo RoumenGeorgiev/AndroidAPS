@@ -77,6 +77,7 @@ public class GoogleAssistantFragment extends SubscriberFragment {
         if(SP.getBoolean("assistant_bolus", false)) {
             assistantBolusEnabledView.setText("Yes");
         } else assistantBolusEnabledView.setText("No bolusing from Assistant");
+        assistantLastCommandView.setText(SP.getString("assistantLastCommand", "No Google Assistant command in history"));
     }
 
     @Subscribe
