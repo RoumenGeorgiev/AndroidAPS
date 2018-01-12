@@ -119,6 +119,24 @@ public class GoogleAssistantPlugin implements PluginBase {
         return tokensString;
     }
 
+    String lastCommand(JSONObject treatment){
+        String result = "";
+        try {
+            if (treatment.has("created_at"))
+                result += "Date :" + treatment.getString("created_at") + "";
+            if (treatment.has("eventType"))
+                result += "\nEvent type: " + treatment.getString("eventType") + "";
+            if (treatment.has("insulin"))
+                result += "\nBolus: " + treatment.getDouble("insulin") + " U";
+            if (treatment.has("carbs"))
+                result += "\nCarbs: " + treatment.getDouble("carbs") + " g";
+            //if (treatment.has(""))
+            //    result += "\nBolus :" + treatment.getDouble("insulin") + " U";
+        } catch (JSONException e) {
+            log.error("Unhandled exception parsing treatment", e);
+        }
+        return result;
+    }
 
     String getTokens(){
         if(this.tokens[0] == null) {
@@ -184,7 +202,7 @@ public class GoogleAssistantPlugin implements PluginBase {
                     updateTokens();
                     log.debug("Assistant: tokens updated: "+ getTokens());
                     // Adding to last command
-                    SP.putString("assistantLastCommand", treatment.toString());
+                    SP.putString("assistantLastCommand", lastCommand(treatment));
                     //remove from NS
                     final String _id = treatment.getString("_id");
                     if (NSUpload.isIdValid(_id)) {
