@@ -530,7 +530,19 @@ public class NSClientService extends Service {
                                     if(MainApp.getSpecificPlugin(GoogleAssistantPlugin.class).isEnabled(PluginBase.GENERAL) && SP.getBoolean("assistant_enabled",false)){
                                         // passing treatment to GoogleAssistant plugin
                                         GoogleAssistantPlugin assistant = new GoogleAssistantPlugin();
-                                        assistant.newTreatment(treatment);
+                                        if(jsonTreatment.has("enteredBy")) {
+                                            //log.debug("Assistant treatment got from NS:"+jsonTreatment.toString());
+                                            //log.debug("Assistant treatment got from NS:" + jsonTreatment.optString("enteredBy", "none"));
+                                            if(jsonTreatment.optString("enteredBy").toString().equals("assistant")) {
+                                                log.debug("Assistant treatment from NS!");
+                                                assistant.newTreatment(jsonTreatment);
+                                                // remove treatment from NS
+                                                removedTreatments.put(jsonTreatment);
+
+                                            } else {
+                                                //log.debug("Assitant NS " + jsonTreatment.optString("enteredBy") + " " + (jsonTreatment.optString("enteredBy") == "assistant"));
+                                            }
+                                        }
                                     }
                                     // remove from upload queue if Ack is failing
                                     UploadQueue.removeID(jsonTreatment);
