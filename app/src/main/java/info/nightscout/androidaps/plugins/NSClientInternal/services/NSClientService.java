@@ -34,7 +34,6 @@ import info.nightscout.androidaps.events.EventAppExit;
 import info.nightscout.androidaps.events.EventConfigBuilderChange;
 import info.nightscout.androidaps.events.EventPreferenceChange;
 import info.nightscout.androidaps.interfaces.PluginBase;
-import info.nightscout.androidaps.plugins.GoogleAssistant.GoogleAssistantPlugin;
 import info.nightscout.androidaps.plugins.NSClientInternal.NSClientInternalPlugin;
 import info.nightscout.androidaps.plugins.NSClientInternal.UploadQueue;
 import info.nightscout.androidaps.plugins.NSClientInternal.acks.NSAddAck;
@@ -526,24 +525,7 @@ public class NSClientService extends Service {
                                     JSONObject jsonTreatment = treatments.getJSONObject(index);
                                     NSTreatment treatment = new NSTreatment(jsonTreatment);
 
-                                    //check if GoogleAssistant plugin is enabled and pass the treatment to it
-                                    if(MainApp.getSpecificPlugin(GoogleAssistantPlugin.class).isEnabled(PluginBase.GENERAL) && SP.getBoolean("assistant_enabled",false)){
-                                        // passing treatment to GoogleAssistant plugin
-                                        GoogleAssistantPlugin assistant = new GoogleAssistantPlugin();
-                                        if(jsonTreatment.has("enteredBy")) {
-                                            //log.debug("Assistant treatment got from NS:"+jsonTreatment.toString());
-                                            //log.debug("Assistant treatment got from NS:" + jsonTreatment.optString("enteredBy", "none"));
-                                            if(jsonTreatment.optString("enteredBy").toString().equals("assistant")) {
-                                                log.debug("Assistant treatment from NS!");
-                                                assistant.newTreatment(jsonTreatment);
-                                                // remove treatment from NS
-                                                removedTreatments.put(jsonTreatment);
 
-                                            } else {
-                                                //log.debug("Assitant NS " + jsonTreatment.optString("enteredBy") + " " + (jsonTreatment.optString("enteredBy") == "assistant"));
-                                            }
-                                        }
-                                    }
                                     // remove from upload queue if Ack is failing
                                     UploadQueue.removeID(jsonTreatment);
                                     //Find latest date in treatment
