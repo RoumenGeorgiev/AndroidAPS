@@ -1,18 +1,27 @@
 package info.nightscout.androidaps.plugins.TuneProfile;
 
+import android.provider.Settings;
+
 import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.IobTotal;
 import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.BgReading;
 import info.nightscout.androidaps.db.Treatment;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData;
+import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -52,7 +61,10 @@ public class TuneProfile implements PluginBase {
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
     public static Profile profile;
     public List<BgReading> glucose_data;
+    public List<BgReading> basalGlucose;
     public static List<Treatment> treatments;
+    private JSONArray mIobData;
+    private IobTotal iob;
 
     @Override
     public String getFragmentClass() {
@@ -213,10 +225,12 @@ public class TuneProfile implements PluginBase {
         for (int i = 1; i < glucose_data.size(); i++) {
             if (glucose_data.get(i).value > 38 && glucose_data.get(i).date < milisMax && glucose_data.get(i).date > milisMin) {
                 avgGlucose += glucose_data.get(i).value;
-                //log.debug("TuneProfile: avgGlucose is "+avgGlucose);
+
+                log.debug("TuneProfile: avgGlucose is "+avgGlucose);
                 counter++;
             }
         }
+        getAutosensData(milisMax);
         return (int) (avgGlucose / counter);
     }
 
@@ -226,16 +240,16 @@ public class TuneProfile implements PluginBase {
         return avgBG.toString();
     }
 
-    public static synchronized String getISF(int hour){
+    public static synchronized double getISF(int hour){
         getPlugin().getProfile();
         int toMgDl = 1;
         if(profile.equals(null))
-            return "Profile is null";
+            return 0d;
         if(profile.getUnits().equals("mmol"))
             toMgDl = 18;
         Double profileISF = profile.getIsf()*toMgDl;
         //log.debug("TuneProfile: ISF is "+profileISF.toString());
-        return profileISF.toString();
+        return profileISF;
     }
 
     public static synchronized Double getBasal(Integer hour){
@@ -249,6 +263,34 @@ public class TuneProfile implements PluginBase {
         c.set(Calendar.MILLISECOND, 0);
 
         return profile.getBasal(System.currentTimeMillis());
+    }
+
+    public double basalBGI(int hour){
+        double currentBasal = profile.getBasal();
+        double sens = getISF(hour);
+        // basalBGI is BGI of basal insulin activity.
+        double basalBGI = Math.round(( currentBasal * sens / 60 * 5 )*100)/100; // U/hr * mg/dL/U * 1 hr / 60 minutes * 5 = mg/dL/5m
+        return basalBGI;
+    }
+
+    public void getIOBdata(long bgTime){
+        //IobTotal[] iobArray = IobCobCalculatorPlugin.calculateIobArrayInDia();
+        IobTotal iob = IobCobCalculatorPlugin.calculateFromTreatmentsAndTemps(bgTime);
+        //mIobData = IobCobCalculatorPlugin.convertToJSONArray(iobArray);
+        //mIobData.toString();
+    }
+
+    public static AutosensData getAutosensData(long time){
+        // first we need to go back in time
+
+        AutosensData autosensData = IobCobCalculatorPlugin.getAutosensData(time);
+        if(autosensData.equals(null)){
+            log.debug("AutosensData is null!!!");
+            return null;
+        }
+        //log.debug("Autosens"+autosensData.toString());
+        //log.debug("Autosense:"+autosensData.log(time));
+        return autosensData;
     }
 
     public static synchronized String getBasalIst(){
@@ -272,6 +314,8 @@ public class TuneProfile implements PluginBase {
 
         return targets;
     }
+
+
 
 
     public static Integer secondsFromMidnight(long date) {

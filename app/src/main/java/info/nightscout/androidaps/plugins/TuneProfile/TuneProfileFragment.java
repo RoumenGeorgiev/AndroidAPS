@@ -41,7 +41,6 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         try {
-            log.debug("TuneProfileFragment: Entering onCreateView");
             View view = inflater.inflate(R.layout.tuneprofile_fragment, container, false);
 
             profileView = (TextView) view.findViewById(R.id.tune_profile);
@@ -67,6 +66,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF(9)+"\nTargets:"+TuneProfile.getTargets());
         lastRunView.setText(""+lastRun.toLocaleString());
         treatmentsView.setText(""+TuneProfile.numberOfTreatments());
+        //TuneProfile.getAutosensData();
         //updateGUI();
     }
 
