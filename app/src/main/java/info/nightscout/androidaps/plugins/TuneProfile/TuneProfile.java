@@ -372,9 +372,17 @@ public class TuneProfile implements PluginBase {
         double isf;
         double target;
         double result;
+        double sensitivity;
+        double sensitivityCarbs = 0d;
         String maxedOutFlag = "";
         String basicResult = "";
         boolean carbs = false;
+
+        //Print First line
+        basicResult =    "------------------------------------------------------------------";
+        basicResult += "\n|Time | Dev | Basal | Suggested | Flags |";
+        basicResult +=    "\n------------------------------------------------------------------";
+
         for(int i=0; i<24; i++){
             // get average BG
             averageBG = getPlugin().averageGlucose(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L);
@@ -384,6 +392,10 @@ public class TuneProfile implements PluginBase {
             basal =getBasal(i);
             // get target
             target = getTargets(i);
+            // get sensitivity
+            sensitivity = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).ratio;
+            sensitivityCarbs = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).carbsAbsorbed;
+            log.debug("sensCarbs:" +sensitivityCarbs);
             // result should be basal -(average - target)/ISF units
             result = round((basal + ((averageBG-target)/isf)), 2);
             // if correction is more than 20% limit it to 20%
@@ -396,18 +408,22 @@ public class TuneProfile implements PluginBase {
             } else
                 maxedOutFlag = "";
 
-            if (carbsInTreatments(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L)) {
+            /*if (carbsInTreatments(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L)) {
                 maxedOutFlag += "(c)";
                 carbs = true;
             } else
                 carbs = false;
-
-            if (averageBG >0 && carbs != true){
-                basicResult += "\n"+i+" dev is "+(averageBG-target)+" so "+basal+" should be "+round(result,2)+" U"+maxedOutFlag;
-            } else if (carbs){
-                basicResult += "\n"+i+" -- carbs absorbed ";
-            } else
-                basicResult += "\n"+i+" -- no data ";
+            */
+            if (averageBG >0 && sensitivityCarbs == 0){
+                basicResult += "\n|   "+i+"   |  "+(averageBG-target)+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
+                basicResult +=    "\n------------------------------------------------------------------";
+            } else if (sensitivityCarbs > 0){
+                basicResult += "\n|   "+i+" | -- carbs absorbed ";
+                basicResult +=    "\n------------------------------------------------------------------";
+            } else {
+                basicResult += "\n|   " + i + " | -- no data ";
+                basicResult += "\n------------------------------------------------------------------";
+            }
 
         }
 
@@ -430,6 +446,7 @@ public class TuneProfile implements PluginBase {
         double isf;
         double target;
         double result;
+
         String maxedOutFlag = "";
         String basicResult = "";
         for(int i=0; i<24; i++){
