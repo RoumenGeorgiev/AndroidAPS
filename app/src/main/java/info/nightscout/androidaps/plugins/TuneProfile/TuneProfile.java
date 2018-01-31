@@ -150,7 +150,7 @@ public class TuneProfile implements PluginBase {
 
             profile = MainApp.getConfigBuilder().getProfile();
         }
-        getGlucoseData();
+        getGlucoseData((System.currentTimeMillis() - 60*60*1000L), System.currentTimeMillis());
     }
 
     public void getProfile(){
@@ -162,9 +162,9 @@ public class TuneProfile implements PluginBase {
         profile = MainApp.getConfigBuilder().getProfile();
     }
 
-    public void getGlucoseData() {
+    public void getGlucoseData(long start, long end) {
         //get glucoseData for 1 day back
-        long oneDayBack = System.currentTimeMillis() - 24 * 60 * 60 *1000L;
+        long oneDayBack = end - 24 * 60 * 60 *1000L;
         glucose_data = MainApp.getDbHelper().getBgreadingsDataFromTime(oneDayBack, false);
         if(glucose_data.size() < 1)
             // no BG data
@@ -178,57 +178,55 @@ public class TuneProfile implements PluginBase {
 
     }
 
-    public void getTreatments(){
+    public void getTreatments(long end){
         //get treatments 24h back
-        double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
-        long fromMills = (long) (System.currentTimeMillis() - 60 * 60 * 1000L * (24 + dia));
-
-        treatments = MainApp.getDbHelper().getTreatmentDataFromTime(fromMills, false);
+        //double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
+        long fromMills = (long) (end - 60 * 60 * 1000L * 24);
+        //TODO from is OK but TO is not set
+        treatments = MainApp.getDbHelper().getTreatmentDataFromTime(fromMills, true);
+        // if treatment.date > end - remove treatment from list
+        int treatmentsRemoved = 0;
+        for(int i=0;i<treatments.size(); i++){
+            if(treatments.get(i).date > end) {
+                treatments.remove(i);
+                treatmentsRemoved++;
+            }
+        }
+        log.debug(treatmentsRemoved+ " treatments removed");
         //log.debug("Treatments size:"+treatments.size());
     }
 
-    public static boolean carbsInTreatments(int hour){
+    public static boolean carbsInTreatments(long start, long end){
         // return true if there is a treatment with carbs during this time
+
         Treatment tempTreatment = new Treatment();
+        Date tempDate;
         boolean carbs = false;
-        // seconds from midnight
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.HOUR_OF_DAY, hour);
-        c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        //long passed = now - c.getTimeInMillis();
-        long milisMax = c.getTimeInMillis();
-        c.set(Calendar.HOUR_OF_DAY, hour-1);
-        c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        long milisMin = c.getTimeInMillis();
-        getPlugin().getTreatments();
+        long milisMax = end;
+        long milisMin = start;
+            getPlugin().getTreatments(end);
         for(int i=0;i<treatments.size(); i++){
             tempTreatment = treatments.get(i);
+            tempDate = new Date((tempTreatment.date));
             if(tempTreatment.carbs > 0 && tempTreatment.date > milisMin && tempTreatment.date < milisMax)
                 carbs = true;
         }
-
+        Date from = new Date(milisMin);
+        Date to = new Date(milisMax);
+        //log.debug("check for carbs from "+((System.currentTimeMillis() - milisMin)/(60*60*1000L))+" to "+((System.currentTimeMillis() - milisMax)/(60*60*1000))+" - "+carbs+"("+treatments.size()+"");
+        //log.debug("check for carbs from "+from.toString()+" to "+to.toString()+" - "+carbs+"("+treatments.size()+"");
         return carbs;
     }
 
-    public static Integer numberOfTreatments(){
-        getPlugin().getTreatments();
+    public static Integer numberOfTreatments(long start, long end){
+        getPlugin().getTreatments(end);
         return treatments.size();
     }
 
-    public String numberOfTreatments(int hour){
-        return "";
-    }
 
-    public synchronized Integer averageGlucose(int hour){
+    public synchronized Integer averageGlucose(long start, long end){
         // initialize glucose_data
-        getGlucoseData();
-        if(hour > 24 || hour < 0){
-            return 0;
-        }
+        getGlucoseData(start, end);
 
         if(glucose_data.size() < 1)
             // no BG data
@@ -236,19 +234,8 @@ public class TuneProfile implements PluginBase {
 
         int counter = 0; // how many bg readings we have
         int avgGlucose = 0;
-        // seconds from midnight
-        Calendar c = Calendar.getInstance();
-        c.set(Calendar.HOUR_OF_DAY, hour);
-        c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        //long passed = now - c.getTimeInMillis();
-        long milisMax = c.getTimeInMillis();
-        c.set(Calendar.HOUR_OF_DAY, hour-1);
-        c.set(Calendar.MINUTE, 0);
-        c.set(Calendar.SECOND, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        long milisMin = c.getTimeInMillis();
+        long milisMax = end;
+        long milisMin = start;
 
         for (int i = 1; i < glucose_data.size(); i++) {
             if (glucose_data.get(i).value > 38 && glucose_data.get(i).date < milisMax && glucose_data.get(i).date > milisMin) {
@@ -265,13 +252,13 @@ public class TuneProfile implements PluginBase {
         return (int) (avgGlucose / counter);
     }
 
-    public static synchronized String averageGlucoseString(int hour){
-        Integer avgBG = getPlugin().averageGlucose(hour);
+    public static synchronized String averageGlucoseString(long start, long end){
+        Integer avgBG = getPlugin().averageGlucose(start, end);
         //log.debug("TuneProfile: avgGlucose is "+avgBG);
         return avgBG.toString();
     }
 
-    public static synchronized double getISF(int hour){
+    public static synchronized double getISF(){
         getPlugin().getProfile();
         int toMgDl = 1;
         if(profile.equals(null))
@@ -298,7 +285,15 @@ public class TuneProfile implements PluginBase {
 
     public double basalBGI(int hour){
         double currentBasal = profile.getBasal();
-        double sens = getISF(hour);
+        double sens = getISF();
+        // basalBGI is BGI of basal insulin activity.
+        double basalBGI = Math.round(( currentBasal * sens / 60 * 5 )*100)/100; // U/hr * mg/dL/U * 1 hr / 60 minutes * 5 = mg/dL/5m
+        return basalBGI;
+    }
+
+    public double basalBGI(long time){
+        double currentBasal = profile.getBasal();
+        double sens = getISF();
         // basalBGI is BGI of basal insulin activity.
         double basalBGI = Math.round(( currentBasal * sens / 60 * 5 )*100)/100; // U/hr * mg/dL/U * 1 hr / 60 minutes * 5 = mg/dL/5m
         return basalBGI;
@@ -333,14 +328,14 @@ public class TuneProfile implements PluginBase {
         return basals;
     }
 
-    public static synchronized String getTargets(){
+    public static synchronized Integer getTargets(){
         getPlugin().getProfile();
         int toMgDl = 1;
         if(profile.equals(null))
-            return "Profile is null";
+            return null;
         if(profile.getUnits().equals("mmol"))
             toMgDl = 18;
-        String targets = ""+(((profile.getTargetLow() * toMgDl)*100)/100);
+        Integer targets = (int) (((profile.getTargetLow() * toMgDl)*100)/100);
 
         return targets;
     }
@@ -357,9 +352,21 @@ public class TuneProfile implements PluginBase {
         return targets;
     }
 
-
-    public static String basicResult(){
+    public static String basicResult(int daysBack){
         // get some info and spit out a suggestion
+        // Time should be 1 day back
+        // time now
+        long now = System.currentTimeMillis();
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(now - (daysBack * 24 * 60 * 60 * 1000L));
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        // midnight
+        long endTime = c.getTimeInMillis();
+        long starttime = endTime - (24 * 60 * 60 * 1000L);
+        // now we have our start and end of day
         int averageBG;
         double basal;
         double isf;
@@ -367,11 +374,12 @@ public class TuneProfile implements PluginBase {
         double result;
         String maxedOutFlag = "";
         String basicResult = "";
+        boolean carbs = false;
         for(int i=0; i<24; i++){
             // get average BG
-            averageBG = getPlugin().averageGlucose(i);
+            averageBG = getPlugin().averageGlucose(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L);
             // get ISF
-            isf =  getISF(i);
+            isf =  getISF();
             //get basal
             basal =getBasal(i);
             // get target
@@ -387,7 +395,64 @@ public class TuneProfile implements PluginBase {
                 maxedOutFlag = "(m)";
             } else
                 maxedOutFlag = "";
-            if (carbsInTreatments(i))
+
+            if (carbsInTreatments(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L)) {
+                maxedOutFlag += "(c)";
+                carbs = true;
+            } else
+                carbs = false;
+
+            if (averageBG >0 && carbs != true){
+                basicResult += "\n"+i+" dev is "+(averageBG-target)+" so "+basal+" should be "+round(result,2)+" U"+maxedOutFlag;
+            } else if (carbs){
+                basicResult += "\n"+i+" -- carbs absorbed ";
+            } else
+                basicResult += "\n"+i+" -- no data ";
+
+        }
+
+        return basicResult;
+    }
+
+    public static String basicResult(){
+        // get some info and spit out a suggestion
+        long now = System.currentTimeMillis();
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(now);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        // midnight
+        long start = c.getTimeInMillis();
+        int averageBG;
+        double basal;
+        double isf;
+        double target;
+        double result;
+        String maxedOutFlag = "";
+        String basicResult = "";
+        for(int i=0; i<24; i++){
+            // get average BG
+            averageBG = getPlugin().averageGlucose(start+(i*60*60*1000l), start + (i+1)*60*60*1000L);
+            // get ISF
+            isf = getISF();
+            //get basal
+            basal = getBasal(i);
+            // get target
+            target = getTargets(i);
+            // result should be basal -(average - target)/ISF units
+            result = round((basal + ((averageBG-target)/isf)), 2);
+            // if correction is more than 20% limit it to 20%
+            if( result/basal > 1.2 ){
+                result = basal * 1.2;
+                maxedOutFlag = "(M)";
+            } else if (result/basal < 0.8){
+                result = basal * 0.8;
+                maxedOutFlag = "(m)";
+            } else
+                maxedOutFlag = "";
+            if (carbsInTreatments(start+ (i*60*60*1000l), start + (i+1)*60*60*1000L))
                 maxedOutFlag += "(c)";
             if (averageBG >0){
                 basicResult += "\n"+i+" dev is "+(averageBG-target)+" so "+basal+" should be "+round(result,2)+" U"+maxedOutFlag;
