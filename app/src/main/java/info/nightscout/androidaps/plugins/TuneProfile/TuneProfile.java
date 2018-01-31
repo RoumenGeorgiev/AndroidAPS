@@ -20,6 +20,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -186,6 +187,33 @@ public class TuneProfile implements PluginBase {
         //log.debug("Treatments size:"+treatments.size());
     }
 
+    public static boolean carbsInTreatments(int hour){
+        // return true if there is a treatment with carbs during this time
+        Treatment tempTreatment = new Treatment();
+        boolean carbs = false;
+        // seconds from midnight
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.HOUR_OF_DAY, hour);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        //long passed = now - c.getTimeInMillis();
+        long milisMax = c.getTimeInMillis();
+        c.set(Calendar.HOUR_OF_DAY, hour-1);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        long milisMin = c.getTimeInMillis();
+        getPlugin().getTreatments();
+        for(int i=0;i<treatments.size(); i++){
+            tempTreatment = treatments.get(i);
+            if(tempTreatment.carbs > 0 && tempTreatment.date > milisMin && tempTreatment.date < milisMax)
+                carbs = true;
+        }
+
+        return carbs;
+    }
+
     public static Integer numberOfTreatments(){
         getPlugin().getTreatments();
         return treatments.size();
@@ -225,12 +253,15 @@ public class TuneProfile implements PluginBase {
         for (int i = 1; i < glucose_data.size(); i++) {
             if (glucose_data.get(i).value > 38 && glucose_data.get(i).date < milisMax && glucose_data.get(i).date > milisMin) {
                 avgGlucose += glucose_data.get(i).value;
-
-                log.debug("TuneProfile: avgGlucose is "+avgGlucose);
                 counter++;
+                //log.debug("TuneProfile: avgGlucose is "+avgGlucose/counter);
+
             }
         }
-        getAutosensData(milisMax);
+        //getAutosensData(milisMax);
+        //avoid division by 0
+        if(counter == 0)
+            counter = 1;
         return (int) (avgGlucose / counter);
     }
 
@@ -247,7 +278,7 @@ public class TuneProfile implements PluginBase {
             return 0d;
         if(profile.getUnits().equals("mmol"))
             toMgDl = 18;
-        Double profileISF = profile.getIsf()*toMgDl;
+        Double profileISF = (double) Math.round((profile.getIsf()*toMgDl*100)/100);
         //log.debug("TuneProfile: ISF is "+profileISF.toString());
         return profileISF;
     }
@@ -262,7 +293,7 @@ public class TuneProfile implements PluginBase {
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
 
-        return profile.getBasal(System.currentTimeMillis());
+        return profile.getBasal(c.getTimeInMillis());
     }
 
     public double basalBGI(int hour){
@@ -282,7 +313,6 @@ public class TuneProfile implements PluginBase {
 
     public static AutosensData getAutosensData(long time){
         // first we need to go back in time
-
         AutosensData autosensData = IobCobCalculatorPlugin.getAutosensData(time);
         if(autosensData.equals(null)){
             log.debug("AutosensData is null!!!");
@@ -310,13 +340,64 @@ public class TuneProfile implements PluginBase {
             return "Profile is null";
         if(profile.getUnits().equals("mmol"))
             toMgDl = 18;
-        String targets = ""+profile.getTargetLow() * toMgDl;
+        String targets = ""+(((profile.getTargetLow() * toMgDl)*100)/100);
+
+        return targets;
+    }
+
+    public static synchronized int getTargets(int hour){
+        getPlugin().getProfile();
+        int toMgDl = 1;
+        if(profile.equals(null))
+            return 0;
+        if(profile.getUnits().equals("mmol"))
+            toMgDl = 18;
+        int targets = (int) (((profile.getTargetLow() * toMgDl)*100)/100);
 
         return targets;
     }
 
 
+    public static String basicResult(){
+        // get some info and spit out a suggestion
+        int averageBG;
+        double basal;
+        double isf;
+        double target;
+        double result;
+        String maxedOutFlag = "";
+        String basicResult = "";
+        for(int i=0; i<24; i++){
+            // get average BG
+            averageBG = getPlugin().averageGlucose(i);
+            // get ISF
+            isf =  getISF(i);
+            //get basal
+            basal =getBasal(i);
+            // get target
+            target = getTargets(i);
+            // result should be basal -(average - target)/ISF units
+            result = round((basal + ((averageBG-target)/isf)), 2);
+            // if correction is more than 20% limit it to 20%
+            if( result/basal > 1.2 ){
+                result = basal * 1.2;
+                maxedOutFlag = "(M)";
+            } else if (result/basal < 0.8){
+                result = basal * 0.8;
+                maxedOutFlag = "(m)";
+            } else
+                maxedOutFlag = "";
+            if (carbsInTreatments(i))
+                maxedOutFlag += "(c)";
+            if (averageBG >0){
+                basicResult += "\n"+i+" dev is "+(averageBG-target)+" so "+basal+" should be "+round(result,2)+" U"+maxedOutFlag;
+            } else
+                basicResult += "\n"+i+" -- no data ";
 
+        }
+
+        return basicResult;
+    }
 
     public static Integer secondsFromMidnight(long date) {
         Calendar c = Calendar.getInstance();
@@ -329,5 +410,13 @@ public class TuneProfile implements PluginBase {
         return (int) (passed / 1000);
     }
 
+    public static double round(double value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+
+        long factor = (long) Math.pow(10, places);
+        value = value * factor;
+        long tmp = Math.round(value);
+        return (double) tmp / factor;
+    }
     // end of TuneProfile Plugin
 }
