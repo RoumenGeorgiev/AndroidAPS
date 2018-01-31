@@ -377,6 +377,8 @@ public class TuneProfile implements PluginBase {
         String maxedOutFlag = "";
         String basicResult = "";
         boolean carbs = false;
+        double deviation = 0d;
+        double netDeviation = 0d;
 
         //Print First line
         basicResult =    "------------------------------------------------------------------";
@@ -395,7 +397,20 @@ public class TuneProfile implements PluginBase {
             // get sensitivity
             sensitivity = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).ratio;
             sensitivityCarbs = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).carbsAbsorbed;
-            log.debug("sensCarbs:" +sensitivityCarbs);
+            //log.debug("sensCarbs:" +sensitivityCarbs);
+            // Look at netDeviations for each hour
+            // Get AutoSensData for 5 min deviations
+            int counter = 0;
+            for (long time = starttime+(i*60*60*1000l); time <= starttime+(i+1)*60*60*1000L; time += 5 * 60 * 1000L) {
+                AutosensData autosensData = IobCobCalculatorPlugin.getAutosensData(time);
+
+                if (autosensData != null) {
+                    deviation += autosensData.deviation;
+                    counter++;
+                }
+            }
+            netDeviation = deviation / counter;
+
             // result should be basal -(average - target)/ISF units
             result = round((basal + ((averageBG-target)/isf)), 2);
             // if correction is more than 20% limit it to 20%
@@ -415,7 +430,8 @@ public class TuneProfile implements PluginBase {
                 carbs = false;
             */
             if (averageBG >0 && sensitivityCarbs == 0){
-                basicResult += "\n|   "+i+"   |  "+(averageBG-target)+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
+                //basicResult += "\n|   "+i+"   |  "+(averageBG-target)+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
+                basicResult += "\n|   "+i+"   |  "+netDeviation+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
                 basicResult +=    "\n------------------------------------------------------------------";
             } else if (sensitivityCarbs > 0){
                 basicResult += "\n|   "+i+" | -- carbs absorbed ";
@@ -440,24 +456,30 @@ public class TuneProfile implements PluginBase {
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
         // midnight
-        long start = c.getTimeInMillis();
+        long starttime = c.getTimeInMillis();
         int averageBG;
         double basal;
         double isf;
         double target;
         double result;
+        double sensitivity = 0d;
+        double sensitivityCarbs;
 
         String maxedOutFlag = "";
         String basicResult = "";
         for(int i=0; i<24; i++){
             // get average BG
-            averageBG = getPlugin().averageGlucose(start+(i*60*60*1000l), start + (i+1)*60*60*1000L);
+            averageBG = getPlugin().averageGlucose(starttime+(i*60*60*1000l), starttime + (i+1)*60*60*1000L);
             // get ISF
             isf = getISF();
             //get basal
             basal = getBasal(i);
             // get target
             target = getTargets(i);
+            // get sensitivity
+            sensitivity = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).ratio;
+            sensitivityCarbs = IobCobCalculatorPlugin.detectSensitivityWithLock(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L).carbsAbsorbed;
+            log.debug("sensCarbs:" +sensitivityCarbs);
             // result should be basal -(average - target)/ISF units
             result = round((basal + ((averageBG-target)/isf)), 2);
             // if correction is more than 20% limit it to 20%
@@ -469,12 +491,18 @@ public class TuneProfile implements PluginBase {
                 maxedOutFlag = "(m)";
             } else
                 maxedOutFlag = "";
-            if (carbsInTreatments(start+ (i*60*60*1000l), start + (i+1)*60*60*1000L))
+            if (carbsInTreatments(starttime+ (i*60*60*1000l), starttime + (i+1)*60*60*1000L))
                 maxedOutFlag += "(c)";
-            if (averageBG >0){
-                basicResult += "\n"+i+" dev is "+(averageBG-target)+" so "+basal+" should be "+round(result,2)+" U"+maxedOutFlag;
-            } else
-                basicResult += "\n"+i+" -- no data ";
+            if (averageBG >0 && sensitivityCarbs == 0){
+                basicResult += "\n|   "+i+"   |  "+(averageBG-target)+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
+                basicResult +=    "\n------------------------------------------------------------------";
+            } else if (sensitivityCarbs > 0){
+                basicResult += "\n|   "+i+" | -- carbs absorbed ";
+                basicResult +=    "\n------------------------------------------------------------------";
+            } else {
+                basicResult += "\n|   " + i + " | -- no data ";
+                basicResult += "\n------------------------------------------------------------------";
+            }
 
         }
 
