@@ -382,7 +382,7 @@ public class TuneProfile implements PluginBase {
 
         //Print First line
         basicResult =    "------------------------------------------------------------------";
-        basicResult += "\n|Time | Dev | Basal | Suggested | Flags |";
+        basicResult += "\n|Hour | Dev | Basal -> Suggested ( Sens )";
         basicResult +=    "\n------------------------------------------------------------------";
 
         for(int i=0; i<24; i++){
@@ -431,14 +431,20 @@ public class TuneProfile implements PluginBase {
             */
             if (averageBG >0 && sensitivityCarbs == 0){
                 //basicResult += "\n|   "+i+"   |  "+(averageBG-target)+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
-                basicResult += "\n|   "+i+"   |  "+netDeviation+" |   "+basal+" U | "+round(result,2)+"|"+round(sensitivity,2)+"|";
-                basicResult +=    "\n------------------------------------------------------------------";
+                if(i<10)
+                    basicResult += "\n|  "+i+"    |  "+round(netDeviation,2)+" |   "+basal+" U -> "+round(result,2)+" ( "+round(sensitivity,2)+" )";
+                else
+                    basicResult += "\n|  "+i+"  |  "+round(netDeviation,2)+" |   "+basal+" U -> "+round(result,2)+" ( "+round(sensitivity,2)+" )";
             } else if (sensitivityCarbs > 0){
-                basicResult += "\n|   "+i+" | -- carbs absorbed ";
-                basicResult +=    "\n------------------------------------------------------------------";
+                if(i<10)
+                    basicResult += "\n|  "+i+" | -- carbs absorbed ";
+                else
+                    basicResult += "\n|  "+i+"  | -- carbs absorbed ";
             } else {
-                basicResult += "\n|   " + i + " | -- no data ";
-                basicResult += "\n------------------------------------------------------------------";
+                if(i<10)
+                    basicResult += "\n|  " + i + " | -- no data ";
+                else
+                    basicResult += "\n|   " + i + " | -- no data ";
             }
 
         }
