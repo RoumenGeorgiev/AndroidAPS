@@ -65,7 +65,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         // lastrun in minutes ???
         profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF()+"\nTargets:"+TuneProfile.getTargets());
         lastRunView.setText(""+lastRun.toLocaleString());
-        treatmentsView.setText(""+TuneProfile.numberOfTreatments(System.currentTimeMillis()- 24*60*60*1000L, System.currentTimeMillis()));
+        //treatmentsView.setText(""+TuneProfile.numberOfTreatments(System.currentTimeMillis()- 24*60*60*1000L, System.currentTimeMillis()));
         //TuneProfile.getAutosensData();
         //updateGUI();
     }
