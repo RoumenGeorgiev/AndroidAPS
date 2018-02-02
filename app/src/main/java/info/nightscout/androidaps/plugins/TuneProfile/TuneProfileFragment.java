@@ -61,7 +61,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     @Override
     public void onClick(View view) {
         Date lastRun = new Date();
-        glucoseDataView.setText(TuneProfile.basicResult(0));
+        glucoseDataView.setText(TuneProfile.basicResult(2));
         // lastrun in minutes ???
         profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF()+"\nTargets:"+TuneProfile.getTargets());
         lastRunView.setText(""+lastRun.toLocaleString());
