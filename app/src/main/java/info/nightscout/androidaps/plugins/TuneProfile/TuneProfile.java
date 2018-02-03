@@ -921,7 +921,8 @@ public class TuneProfile implements PluginBase {
 
     public static String basicResult(int daysBack) {
         // get some info and spit out a suggestion
-        // Time should be 1 day back
+        // TODO: if daysBack > 1 call it multiple times and do an average of the suggestion
+        // TODO: Same function for ISF and CR
         // time now
         long now = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
