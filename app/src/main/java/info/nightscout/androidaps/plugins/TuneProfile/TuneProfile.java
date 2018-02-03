@@ -18,6 +18,9 @@ import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensResult;
 import info.nightscout.androidaps.plugins.TuneProfile.AutosensData;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.events.EventAutosensCalculationFinished;
+import info.nightscout.utils.Round;
+import info.nightscout.utils.SP;
+import info.nightscout.utils.SafeParse;
 
 import org.json.JSONArray;
 import org.slf4j.Logger;
@@ -25,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -65,8 +69,8 @@ public class TuneProfile implements PluginBase {
     private static TuneProfile tuneProfile = null;
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
     public static Profile profile;
-    public static List<Double> tunedBasals = new ArrayList<Double>();;
-    public List<BgReading> glucose_data;
+    public static List<Double> tunedBasals = new ArrayList<Double>();
+    public List<BgReading> glucose_data = new ArrayList<BgReading>();
     public List<BgReading> basalGlucose;
     public static List<Treatment> treatments;
     private JSONArray mIobData;
@@ -168,18 +172,20 @@ public class TuneProfile implements PluginBase {
         //get glucoseData for 1 day back
         long oneDayBack = end - 24 * 60 * 60 *1000L;
         glucose_data = MainApp.getDbHelper().getBgreadingsDataFromTime(oneDayBack, false);
-//        log.debug("CheckPoint 12-1 - glucose_data.size is "+glucose_data.size()+" from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
+        log.debug("CheckPoint 12-1 - glucose_data.size is "+glucose_data.size()+" from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
         int initialSize = glucose_data.size();
-        if(glucose_data.size() < 1)
+        if(glucose_data.size() < 1) {
             // no BG data
+            log.debug("CheckPoint 12-4 - No BG data");
             return;
+        }
         for (int i = 1; i < glucose_data.size(); i++) {
             if (glucose_data.get(i).value > 38) {
-                if(glucose_data.get(i).date > end)
+                if(glucose_data.get(i).date > end || glucose_data.get(i).date == glucose_data.get(i-1).date)
                     glucose_data.remove(i);
             }
         }
-        log.debug("CheckPoint 12-1 - glucose_data.size is "+glucose_data.size()+"("+initialSize+") from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
+        log.debug("CheckPoint 12-2 - glucose_data.size is "+glucose_data.size()+"("+initialSize+") from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
     }
 
     public void getTreatments(long end){
@@ -432,9 +438,9 @@ public class TuneProfile implements PluginBase {
 
     public synchronized Integer averageGlucose(long start, long end){
         // initialize glucose_data
-        if(glucose_data.size() == 0)
+        if(glucose_data.size() < 2)
             getGlucoseData(start, end);
-//        log.debug("CheckPoint 12-4 glucose_data.size is"+glucose_data.size());
+        log.debug("CheckPoint 12-4 glucose_data.size is "+glucose_data.size()+" from "+new Date(start).toString()+" to "+new  Date(end).toString());
         if(glucose_data.size() < 1)
             // no BG data
             return 0;
@@ -443,11 +449,16 @@ public class TuneProfile implements PluginBase {
         int avgGlucose = 0;
         long milisMax = end;
         long milisMin = start;
-
+        trimGlucose(start, end);
         for (int i = 1; i < glucose_data.size(); i++) {
-            if (glucose_data.get(i).value > 38 && glucose_data.get(i).date < milisMax && glucose_data.get(i).date > milisMin) {
-                avgGlucose += glucose_data.get(i).value;
-                counter++;
+            if (glucose_data.get(i).value > 38 || glucose_data.get(i).date < milisMax || glucose_data.get(i).date > milisMin) {
+                if(glucose_data.get(i).date == glucose_data.get(i-1).date)
+                    log.debug("CheckPoint 12-5 We have duplicate");
+                 else {
+                     avgGlucose += glucose_data.get(i).value;
+                     counter++;
+                }
+
                 //log.debug("TuneProfile: avgGlucose is "+avgGlucose/counter);
 
             }
@@ -457,6 +468,29 @@ public class TuneProfile implements PluginBase {
         if(counter == 0)
             counter = 1;
         return (int) (avgGlucose / counter);
+    }
+
+    public synchronized void trimGlucose(long start, long end){
+        // initialize glucose_data
+        if(glucose_data.size() == 0)
+            getGlucoseData(start, end);
+        if(glucose_data.size() < 1)
+            // no BG data
+            return ;
+
+        long milisMax = end;
+        long milisMin = start;
+
+        for (int i = 1; i < glucose_data.size(); i++) {
+            if (glucose_data.get(i).value > 38 || glucose_data.get(i).date < milisMax || glucose_data.get(i).date > milisMin) {
+                if(glucose_data.get(i).date == glucose_data.get(i-1).date){
+                    log.debug("CheckPoint 12-5 We have duplicate");
+                }
+                glucose_data.remove(i);
+            }
+        }
+        log.debug("CheckPoint 12-6 size after trim is "+glucose_data.size());
+        return;
     }
 
 
@@ -549,7 +583,7 @@ public class TuneProfile implements PluginBase {
 
         long oldestDataAvailable = MainApp.getConfigBuilder().oldestDataAvailable();
         long getBGDataFrom = Math.max(oldestDataAvailable, (long) (now - 60 * 60 * 1000L * (24 + MainApp.getConfigBuilder().getProfile().getDia())));
-        log.debug("Limiting data to oldest available temps: " + new Date(oldestDataAvailable).toString());
+        log.debug("CheckPoint 7-13 Limiting data to oldest available temps: " + new Date(oldestDataAvailable).toString());
         return getBGDataFrom;
     }
 
@@ -573,10 +607,127 @@ public class TuneProfile implements PluginBase {
     }
 
     private static AutosensResult detectSensitivity(long fromTime, long toTime) {
-        return ConfigBuilderPlugin.getActiveSensitivity().detectSensitivity(fromTime, toTime);
+        return getPlugin().detectSensitivityOref0(fromTime, toTime);
+    }
+
+    public static LongSparseArray<AutosensData> getAutosensDataTable() {
+        return autosensDataTable;
+    }
+
+    public AutosensResult detectSensitivityOref0(long fromTime, long toTime) {
+        LongSparseArray<AutosensData> autosensDataTable = getPlugin().getAutosensDataTable();
+
+        String age = SP.getString(R.string.key_age, "");
+        int defaultHours = 24;
+        if (age.equals(MainApp.sResources.getString(R.string.key_adult))) defaultHours = 24;
+        if (age.equals(MainApp.sResources.getString(R.string.key_teenage))) defaultHours = 24;
+        if (age.equals(MainApp.sResources.getString(R.string.key_child))) defaultHours = 24;
+        int hoursForDetection = SP.getInt(R.string.key_openapsama_autosens_period, defaultHours);
+
+        long now = System.currentTimeMillis();
+
+        if (autosensDataTable == null || autosensDataTable.size() < 4) {
+            log.debug("No autosens data available");
+            return new AutosensResult();
+        }
+
+        info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData current = IobCobCalculatorPlugin.getLastAutosensData();
+        if (current == null) {
+            log.debug("No current autosens data available");
+            return new AutosensResult();
+        }
+
+
+        List<Double> deviationsArray = new ArrayList<>();
+        String pastSensitivity = "";
+        int index = 0;
+        while (index < autosensDataTable.size()) {
+            AutosensData autosensData = autosensDataTable.valueAt(index);
+
+            if (autosensData.time < fromTime) {
+                index++;
+                continue;
+            }
+
+            if (autosensData.time > toTime) {
+                index++;
+                continue;
+            }
+
+            if (autosensData.time > toTime - hoursForDetection * 60 * 60 * 1000L)
+                deviationsArray.add(autosensData.nonEqualDeviation ? autosensData.deviation : 0d);
+            if (deviationsArray.size() > hoursForDetection * 60 / 5)
+                deviationsArray.remove(0);
+
+            pastSensitivity += autosensData.pastSensitivity;
+            int secondsFromMidnight = Profile.secondsFromMidnight(autosensData.time);
+            if (secondsFromMidnight % 3600 < 2.5 * 60 || secondsFromMidnight % 3600 > 57.5 * 60) {
+                pastSensitivity += "(" + Math.round(secondsFromMidnight / 3600d) + ")";
+            }
+            index++;
+        }
+
+        Double[] deviations = new Double[deviationsArray.size()];
+        deviations = deviationsArray.toArray(deviations);
+
+        Profile profile = MainApp.getConfigBuilder().getProfile();
+
+        double sens = profile.getIsf();
+
+        double ratio = 1;
+        String ratioLimit = "";
+        String sensResult = "";
+
+        log.debug("Records: " + index + "   " + pastSensitivity);
+        Arrays.sort(deviations);
+
+        for (double i = 0.9; i > 0.1; i = i - 0.02) {
+            if (IobCobCalculatorPlugin.percentile(deviations, (i + 0.02)) >= 0 && IobCobCalculatorPlugin.percentile(deviations, i) < 0) {
+                log.debug(Math.round(100 * i) + "% of non-meal deviations negative (target 45%-50%)");
+            }
+        }
+        double pSensitive = IobCobCalculatorPlugin.percentile(deviations, 0.50);
+        double pResistant = IobCobCalculatorPlugin.percentile(deviations, 0.45);
+
+        double basalOff = 0;
+
+        if (pSensitive < 0) { // sensitive
+            basalOff = pSensitive * (60 / 5) / Profile.toMgdl(sens, profile.getUnits());
+            sensResult = "Excess insulin sensitivity detected";
+        } else if (pResistant > 0) { // resistant
+            basalOff = pResistant * (60 / 5) / Profile.toMgdl(sens, profile.getUnits());
+            sensResult = "Excess insulin resistance detected";
+        } else {
+            sensResult = "Sensitivity normal";
+        }
+        log.debug(sensResult);
+        ratio = 1 + (basalOff / profile.getMaxDailyBasal());
+
+        double rawRatio = ratio;
+        ratio = Math.max(ratio, SafeParse.stringToDouble(SP.getString("openapsama_autosens_min", "0.7")));
+        ratio = Math.min(ratio, SafeParse.stringToDouble(SP.getString("openapsama_autosens_max", "1.2")));
+
+        if (ratio != rawRatio) {
+            ratioLimit = "Ratio limited from " + rawRatio + " to " + ratio;
+            log.debug(ratioLimit);
+        }
+
+        double newisf = Math.round(Profile.toMgdl(sens, profile.getUnits()) / ratio);
+        if (ratio != 1) {
+            log.debug("ISF adjusted from " + Profile.toMgdl(sens, profile.getUnits()) + " to " + newisf);
+        }
+
+        AutosensResult output = new AutosensResult();
+        output.ratio = Round.roundTo(ratio, 0.01);
+        output.carbsAbsorbed = Round.roundTo(current.cob, 0.01);
+        output.pastSensitivity = pastSensitivity;
+        output.ratioLimit = ratioLimit;
+        output.sensResult = sensResult;
+        return output;
     }
 
     private void calculateSensitivityData(long startTime, long endTime) {
+        log.debug("CheckPoint 12-8 bucketed data is now "+bucketed_data.size());
         if (MainApp.getConfigBuilder() == null)
             return; // app still initializing
         if (MainApp.getConfigBuilder().getProfile() == null)
@@ -585,6 +736,7 @@ public class TuneProfile implements PluginBase {
         long oldestTimeWithData = oldestDataAvailable();
         log.debug("CheckPoint 6-1 getting bucketed data");
         createBucketedData(endTime);
+        log.debug("CheckPoint 12-8 bucketed data is recalculated "+bucketed_data.size());
         synchronized (dataLock) {
 
             if (bucketed_data == null || bucketed_data.size() < 3) {
@@ -593,21 +745,24 @@ public class TuneProfile implements PluginBase {
             }
 
             long prevDataTime = roundUpTime(bucketed_data.get(bucketed_data.size() - 3).date);
-            log.debug("Prev data time: " + new Date(prevDataTime).toLocaleString());
+            log.debug("CheckPoint 7-1 Prev data time: " + new Date(prevDataTime).toLocaleString());
             AutosensData previous = autosensDataTable.get(prevDataTime);
             // start from oldest to be able sub cob
             for (int i = bucketed_data.size() - 4; i >= 0; i--) {
                 // check if data already exists
                 long bgTime = bucketed_data.get(i).date;
-                log.debug("CheckPoint 7-1 bucketed_data.date is"+new Date(bucketed_data.get(i).date).toString());
+                log.debug("CheckPoint 7-1 bucketed_data.date is " + new Date(bucketed_data.get(i).date).toString());
                 bgTime = roundUpTime(bgTime);
-                if (bgTime > System.currentTimeMillis())
+                log.debug("CheckPoint 7-1 after roundup is " + new Date(bgTime).toString());
+                if (bgTime > System.currentTimeMillis() || bgTime > endTime){
+                    log.debug("CheckPoint 7-1 bgTime is bigger than endtime - returning");
                     continue;
+//                    return;
+                }
                 Profile profile = MainApp.getConfigBuilder().getProfile(bgTime);
-
                 AutosensData existing;
-                if ((existing = autosensDataTable.get(bgTime)) != null) {
-                    log.debug("CheckPoint 7-3");
+                if ((existing = autosensDataTable.get(bgTime)) != null && bgTime < endTime) {
+                    log.debug("CheckPoint 7-4-1 existing is not null");
                     previous = existing;
                     continue;
                 }
@@ -616,12 +771,12 @@ public class TuneProfile implements PluginBase {
                     log.debug("CheckPoint 7-4-1 exiting no ISF");
                     return; // profile not set yet
                 }
-
+                log.debug("CheckPoint 7-4 before sens");
                 double sens = Profile.toMgdl(profile.getIsf(bgTime), profile.getUnits());
                 log.debug("CheckPoint 7-4");
                 AutosensData autosensData = new AutosensData();
                 autosensData.time = bgTime;
-                log.debug("CheckPoint 7-2 autosensData.time is"+new Date(autosensData.time).toString());
+                log.debug("CheckPoint 7-2 autosensData.time is "+new Date(autosensData.time).toString());
                 if (previous != null)
                     activeCarbsList = new ArrayList<>(previous.activeCarbsList);
                 else
@@ -629,7 +784,7 @@ public class TuneProfile implements PluginBase {
 
                 //console.error(bgTime , bucketed_data[i].glucose);
                 double bg;
-                double avgDelta;
+                double avgDelta = 0;
                 double delta;
                 bg = bucketed_data.get(i).value;
                 if (bg < 39 || bucketed_data.get(i + 3).value < 39) {
@@ -642,11 +797,10 @@ public class TuneProfile implements PluginBase {
 
                 double bgi = -iob.activity * sens * 5;
                 double deviation = delta - bgi;
-
                 List<Treatment> recentTreatments = MainApp.getConfigBuilder().getTreatments5MinBackFromHistory(bgTime);
                 for (int ir = 0; ir < recentTreatments.size(); ir++) {
                     autosensData.carbsFromBolus += recentTreatments.get(ir).carbs;
-                    //autosensData.activeCarbsList.add(new AutosensData.CarbsInPast(recentTreatments.get(ir)));
+                    autosensData.activeCarbsList.add(new AutosensData.CarbsInPast(recentTreatments.get(ir)));
                 }
 
 
@@ -689,13 +843,15 @@ public class TuneProfile implements PluginBase {
                 } else {
                     autosensData.pastSensitivity += "C";
                 }
-                //log.debug("TIME: " + new Date(bgTime).toString() + " BG: " + bg + " SENS: " + sens + " DELTA: " + delta + " AVGDELTA: " + avgDelta + " IOB: " + iob.iob + " ACTIVITY: " + iob.activity + " BGI: " + bgi + " DEVIATION: " + deviation);
+                log.debug("CheckPoint 7-2 TIME: " + new Date(bgTime).toString() + " BG: " + bg + " SENS: " + sens + " DELTA: " + delta + " AVGDELTA: " + avgDelta + " IOB: " + iob.iob + " ACTIVITY: " + iob.activity + " BGI: " + bgi + " DEVIATION: " + deviation);
 
                 previous = autosensData;
                 Date entering = new Date(bgTime);
-                log.debug("CheckPoint 6-2 putting something in autosesnsDataTable - "+entering.toString()+" - "+autosensData.autosensRatio);
+                log.debug("CheckPoint 7-2 putting something in autosesnsDataTable - "+entering.toString()+" - "+autosensData.autosensRatio);
                 autosensDataTable.put(bgTime, autosensData);
-                autosensData.autosensRatio = detectSensitivity(oldestTimeWithData, bgTime).ratio;
+//                autosensData.autosensRatio = detectSensitivity(oldestTimeWithData, bgTime).ratio;
+                autosensData.autosensRatio = detectSensitivity(startTime, bgTime).ratio;
+                log.debug("CheckPoint 7-2 calculated ratio is "+autosensData.autosensRatio);
             }
         }
         // MainApp.bus().post(new EventAutosensCalculationFinished());
@@ -775,7 +931,7 @@ public class TuneProfile implements PluginBase {
         return targets;
     }
 
-    public static String basicResult(int daysBack){
+    public static String basicResult(int daysBack) {
         // get some info and spit out a suggestion
         // Time should be 1 day back
         // time now
@@ -803,17 +959,24 @@ public class TuneProfile implements PluginBase {
         double netDeviation = 0d;
         tunedBasalsInit();
         getPlugin().createBucketedData(endTime);
+        log.debug("CheckPoint 12-8 bucketed_data size "+bucketed_data.size());
         getPlugin().calculateSensitivityData(starttime, endTime);
-        getPlugin().getGlucoseData(starttime, endTime);
-        AutosensData autosensData = getAutosensData(endTime);
+        //getPlugin().getGlucoseData(starttime, endTime);
+        //AutosensData autosensData = getAutosensData(endTime);
 
-        for(int i=0; i<24; i++){
+        // Detecting sensitivity for the whole day
+        AutosensResult autosensResult = detectSensitivity(starttime, endTime);
+        log.debug("CheckPoint 7-12 sensitivity is "+autosensResult.ratio +" from "+new Date(starttime).toString()+" to "+new Date(endTime));
+
+        for (int i = 0; i < 24; i++) {
 
             // get average BG
             log.debug("CheckPoint 12-3 - getting glucose");
-            averageBG = getPlugin().averageGlucose(starttime+(i*60*60*1000l), starttime+(i+1)*60*60*1000L);
+            getPlugin().getGlucoseData(starttime, endTime);
+            log.debug("CheckPoint 12-3 - records "+getPlugin().glucose_data.size());
+            averageBG = getPlugin().averageGlucose(starttime + (i * 60 * 60 * 1000l), starttime + (i + 1) * 60 * 60 * 1000L);
             // get ISF
-            isf =  getISF();
+            isf = getISF();
 
             // Look at netDeviations for each hour
             // Get AutoSensData for 5 min deviations
@@ -822,10 +985,10 @@ public class TuneProfile implements PluginBase {
             deviation = 0;
             int counter = 0;
 
-            for (long time = starttime+(i*60*60*1000l); time <= starttime+(i+1)*60*60*1000L; time += 5 * 60 * 1000L) {
+            for (long time = starttime + (i * 60 * 60 * 1000l); time <= starttime + (i + 1) * 60 * 60 * 1000L; time += 5 * 60 * 1000L) {
 
-                autosensData = getAutosensData(time);
-                if(autosensData == null) {
+//                autosensData = getAutosensData(time);
+                /*if(autosensData == null) {
                     autosensData = getLastAutosensData();
                     log.debug("CheckPoint 6-5 - autosensData is "+((time - autosensData.time)/(60*1000L))+" min older");
                     if(time - autosensData.time < 0){
@@ -848,72 +1011,78 @@ public class TuneProfile implements PluginBase {
             // only apply 20% of the needed adjustment to keep things relatively stable
             basalNeeded = 0.2 * netDeviation / isf;
             basalNeeded = round(basalNeeded,2);
-
-            // if basalNeeded is positive, adjust each of the 1-3 hour prior basals by 10% of the needed adjustment
-            if (basalNeeded > 0 ) {
-                for (int offset = -3; offset < 0; offset++) {
-                    int offsetHour = i + offset;
-                    if (offsetHour < 0) {
-                        offsetHour += 24;
-                    }
-                    //console.error(offsetHour);
-                    if(tunedBasals.get(offsetHour) == 0d) {
-                        log.debug("Tuned at " + offsetHour + " is zero!");
-                        tunedBasals.set(offsetHour, getBasal(offsetHour));
-                    }
-                    tunedBasals.set(offsetHour, (tunedBasals.get(offsetHour)+round(basalNeeded / 3, 3)));
-                }
-                // otherwise, figure out the percentage reduction required to the 1-3 hour prior basals
-                // and adjust all of them downward proportionally
-            } else if (basalNeeded < 0) {
-                double threeHourBasal = 0;
-                for (int offset=-3; offset < 0; offset++) {
-                    int offsetHour = i + offset;
-                    if (offsetHour < 0) { offsetHour += 24; }
-                    threeHourBasal += tunedBasals.get(offsetHour);
-                }
-                double adjustmentRatio = 1.0 + basalNeeded / threeHourBasal;
-                //console.error(adjustmentRatio);
-                for (int offset=-3; offset < 0; offset++) {
-                   int offsetHour = i + offset;
-                    if (offsetHour < 0) { offsetHour += 24; }
-                    if(tunedBasals.get(offsetHour) == 0d) {
-                        log.debug("Tuned at " + offsetHour + " is zero!");
-                        tunedBasals.set(offsetHour, getBasal(offsetHour));
-                    }
-                    tunedBasals.set(offsetHour, round(getBasal(offsetHour) * adjustmentRatio,3));
-                }
-            }
-            // some hours of the day rarely have data to tune basals due to meals.
-            // when no adjustments are needed to a particular hour, we should adjust it toward the average of the
-            // periods before and after it that do have data to be tuned
-            int lastAdjustedHour = 0;
-            // scan through newHourlyBasalProfile(tunedBasals and find hours where the rate is unchanged
-            for (int hour=0; hour < 24; hour++) {
-                if (profile.getBasal(hour*3600) == tunedBasals.get(hour)) {
-                    int nextAdjustedHour = 23;
-                    for (int nextHour = hour; nextHour < 24; nextHour++) {
-                        if (! (profile.getBasal(nextHour*3600) == tunedBasals.get(nextHour))) {
-                            nextAdjustedHour = nextHour;
-                            break;
-                            //} else {
-                            //console.error(nextHour, hourlyBasalProfile[nextHour].rate, newHourlyBasalProfile[nextHour].rate);
+*/
+                // if basalNeeded is positive, adjust each of the 1-3 hour prior basals by 10% of the needed adjustment
+                if (basalNeeded > 0) {
+                    for (int offset = -3; offset < 0; offset++) {
+                        int offsetHour = i + offset;
+                        if (offsetHour < 0) {
+                            offsetHour += 24;
                         }
+                        //console.error(offsetHour);
+                        if (tunedBasals.get(offsetHour) == 0d) {
+                            log.debug("Tuned at " + offsetHour + " is zero!");
+                            tunedBasals.set(offsetHour, getBasal(offsetHour));
+                        }
+                        tunedBasals.set(offsetHour, (tunedBasals.get(offsetHour) + round(basalNeeded / 3, 3)));
                     }
-                    //console.error(hour, newHourlyBasalProfile);
-                    tunedBasals.set(hour, round( (0.8*profile.getBasal(hour*3600) + 0.1*tunedBasals.get(lastAdjustedHour) + 0.1*tunedBasals.get(nextAdjustedHour)*1000 )/1000,2));
-                } else {
-                    lastAdjustedHour = hour;
+                    // otherwise, figure out the percentage reduction required to the 1-3 hour prior basals
+                    // and adjust all of them downward proportionally
+                } else if (basalNeeded < 0) {
+                    double threeHourBasal = 0;
+                    for (int offset = -3; offset < 0; offset++) {
+                        int offsetHour = i + offset;
+                        if (offsetHour < 0) {
+                            offsetHour += 24;
+                        }
+                        threeHourBasal += tunedBasals.get(offsetHour);
+                    }
+                    double adjustmentRatio = 1.0 + basalNeeded / threeHourBasal;
+                    //console.error(adjustmentRatio);
+                    for (int offset = -3; offset < 0; offset++) {
+                        int offsetHour = i + offset;
+                        if (offsetHour < 0) {
+                            offsetHour += 24;
+                        }
+                        if (tunedBasals.get(offsetHour) == 0d) {
+                            log.debug("Tuned at " + offsetHour + " is zero!");
+                            tunedBasals.set(offsetHour, getBasal(offsetHour));
+                        }
+                        tunedBasals.set(offsetHour, round(getBasal(offsetHour) * adjustmentRatio, 3));
+                    }
                 }
-            }
-            for(int ii = 0; ii< 24; ii++) {
-                log.debug("Tuned is "+ii+" is "+tunedBasals.get(ii));
-            }
+                // some hours of the day rarely have data to tune basals due to meals.
+                // when no adjustments are needed to a particular hour, we should adjust it toward the average of the
+                // periods before and after it that do have data to be tuned
+                int lastAdjustedHour = 0;
+                // scan through newHourlyBasalProfile(tunedBasals and find hours where the rate is unchanged
+                for (int hour = 0; hour < 24; hour++) {
+                    if (profile.getBasal(hour * 3600) == tunedBasals.get(hour)) {
+                        int nextAdjustedHour = 23;
+                        for (int nextHour = hour; nextHour < 24; nextHour++) {
+                            if (!(profile.getBasal(nextHour * 3600) == tunedBasals.get(nextHour))) {
+                                nextAdjustedHour = nextHour;
+                                break;
+                                //} else {
+                                //console.error(nextHour, hourlyBasalProfile[nextHour].rate, newHourlyBasalProfile[nextHour].rate);
+                            }
+                        }
+                        //console.error(hour, newHourlyBasalProfile);
+                        tunedBasals.set(hour, round((0.8 * profile.getBasal(hour * 3600) + 0.1 * tunedBasals.get(lastAdjustedHour) + 0.1 * tunedBasals.get(nextAdjustedHour) * 1000) / 1000, 2));
+                    } else {
+                        lastAdjustedHour = hour;
+                    }
+                }
+                for (int ii = 0; ii < 24; ii++) {
+                    log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii));
+                }
 
+            }
+            if (averageBG > 0) {
+                return averageBG + "\n" + displayBasalsResult();
+            } else return "No BG data!(basicResult()";
         }
-        if(averageBG > 0) {
-            return averageBG+"\n"+displayBasalsResult();
-        } else return "No BG data!";
+        return displayBasalsResult();
     }
 
 
