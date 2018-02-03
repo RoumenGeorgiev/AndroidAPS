@@ -993,8 +993,8 @@ public class TuneProfile implements PluginBase {
                     deviation += autosensData.deviation;
                     log.debug("Dev is:"+deviation+" at "+new Date(autosensData.time).toLocaleString());
                     counter++;
-                } else
-                    log.debug("CheckPoint 6-3 Cannot get autosens data for "+time);
+                } //else
+//                    log.debug("CheckPoint 6-3 Cannot get autosens data for "+time);
 
             }
             // use net dev not average
@@ -1065,15 +1065,31 @@ public class TuneProfile implements PluginBase {
                         lastAdjustedHour = hour;
                     }
                 }
-                for (int ii = 0; ii < 24; ii++) {
-                    log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii));
-                }
 
+
+            }
+            for (int ii = 0; ii < 24; ii++) {
+                //console.error(newHourlyBasalProfile[hour],hourlyPumpProfile[hour].rate*1.2);
+                // cap adjustments at autosens_max and autosens_min
+                double autotuneMax = SafeParse.stringToDouble(SP.getString("openapsama_autosens_max", "1.2"));
+                double autotuneMin = SafeParse.stringToDouble(SP.getString("openapsama_autosens_min", "0.7"));
+                double maxRate = tunedBasals.get(ii) * autotuneMax;
+                double minRate = tunedBasals.get(ii) * autotuneMin;
+                if (tunedBasals.get(ii) > maxRate ) {
+//                    console.error("Limiting hour",hour,"basal to",maxRate.toFixed(2),"(which is",autotuneMax,"* pump basal of",hourlyPumpProfile[hour].rate,")");
+                    //console.error("Limiting hour",hour,"basal to",maxRate.toFixed(2),"(which is 20% above pump basal of",hourlyPumpProfile[hour].rate,")");
+                    tunedBasals.set(ii, maxRate);
+                } else if (tunedBasals.get(ii) < minRate ) {
+//                    console.error("Limiting hour",hour,"basal to",minRate.toFixed(2),"(which is",autotuneMin,"* pump basal of",hourlyPumpProfile[hour].rate,")");
+                    //console.error("Limiting hour",hour,"basal to",minRate.toFixed(2),"(which is 20% below pump basal of",hourlyPumpProfile[hour].rate,")");
+                    tunedBasals.set(ii, minRate);
+                }
+                tunedBasals.set(ii, round(tunedBasals.get(ii),3));
+                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii));
             }
             if (averageBG > 0) return averageBG + "\n" + displayBasalsResult();
             else return "No BG data!(basicResult()";
 
-//        return displayBasalsResult();
     }
 
 
