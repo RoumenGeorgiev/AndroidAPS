@@ -34,7 +34,6 @@ import android.util.TypedValue;
 // Added by Rumen for scalable text 
 import android.content.Context;
 import info.nightscout.androidaps.MainApp;
-
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.BaseSeries;
 
@@ -48,14 +47,12 @@ import java.util.Iterator;
  * @author jjoe64
  */
 public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> extends BaseSeries<E> {
-    // Default spSize (12 / 1080) * actualScreenWidth in pixels
-    Context context = MainApp.instance().getApplicationContext();
-    float widthMultiplyer = context.getResources().getDisplayMetrics().widthPixels / 1080;
-    float spSize = ((float) context.getResources().getDisplayMetrics().widthPixels / 1080) * 15;
+    // Default spSize
+    int spSize = 12;
     // Convert the sp to pixels
-
-    float scaledTextSize = spSize * context.getResources().getDisplayMetrics().scaledDensity * widthMultiplyer;
-    float scaledPxSize = context.getResources().getDisplayMetrics().scaledDensity * 1.5f * widthMultiplyer;
+    Context context = MainApp.instance().getApplicationContext();
+    float scaledTextSize = spSize * context.getResources().getDisplayMetrics().scaledDensity;
+    float scaledPxSize = context.getResources().getDisplayMetrics().scaledDensity * 1.5f;
 
     /**
      * choose a predefined shape to render for
@@ -121,6 +118,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
     @Override
     public void draw(GraphView graphView, Canvas canvas, boolean isSecondScale) {
         resetDataPoints();
+
         // get data
         double maxX = graphView.getViewport().getMaxX(false);
         double minX = graphView.getViewport().getMinX(false);
@@ -138,9 +136,6 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
         Iterator<E> values = getValues(minX, maxX);
 
         // draw background
-        double lastEndY = 0;
-        double lastEndX = 0;
-
         // draw data
 
         double diffY = maxY - minY;
@@ -151,9 +146,8 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
         float graphLeft = graphView.getGraphContentLeft();
         float graphTop = graphView.getGraphContentTop();
 
-        lastEndY = 0;
-        lastEndX = 0;
-        float firstX = 0;
+        float scaleX = (float) (graphWidth / diffX);
+
         int i=0;
         while (values.hasNext()) {
             E value = values.next();
@@ -168,9 +162,6 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
             double ratX = valX / diffX;
             double x = graphWidth * ratX;
 
-            double orgX = x;
-            double orgY = y;
-
             // overdraw
             boolean overdraw = false;
             if (x > graphWidth) { // end right
@@ -182,6 +173,14 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
             if (y > graphHeight) { // end top
                 overdraw = true;
             }
+
+            long duration = value.getDuration();
+            float endWithDuration = (float) (x + duration * scaleX + graphLeft + 1);
+            // cut off to graph start if needed
+            if (x < 0 && endWithDuration > 0) {
+                x = 0;
+            }
+
             /* Fix a bug that continue to show the DOT after Y axis */
             if(x < 0) {
                 overdraw = true;
@@ -192,8 +191,8 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
             registerDataPoint(endX, endY, value);
 
             float xpluslength = 0;
-            if (value.getDuration() > 0) {
-                xpluslength = endX + Math.min((float) (value.getDuration() * graphWidth / diffX), graphLeft + graphWidth);
+            if (duration > 0) {
+                xpluslength = Math.min(endWithDuration, graphLeft + graphWidth);
             }
 
             // draw data point
@@ -207,7 +206,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
                     mPaint.setStyle(Paint.Style.FILL);
                     mPaint.setStrokeWidth(0);
                     canvas.drawCircle(endX, endY, scaledPxSize, mPaint);
-                    mPaint.setColor(value.getColor());
+                    mPaint.setColor(value.getSecondColor());
                     mPaint.setStyle(Paint.Style.FILL);
                     mPaint.setStrokeWidth(0);
                     canvas.drawCircle(endX, endY, scaledPxSize / 3, mPaint);
@@ -245,7 +244,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
                         Rect bounds = new Rect((int)endX, (int)endY + 3, (int) (xpluslength), (int) endY + 8);
                         mPaint.setStyle(Paint.Style.FILL_AND_STROKE);
                         canvas.drawRect(bounds, mPaint);
-                        mPaint.setTextSize((float) scaledTextSize);
+                        mPaint.setTextSize((float) (scaledTextSize));
                         mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
                         mPaint.setFakeBoldText(true);
                         canvas.drawText(value.getLabel(), endX, endY, mPaint);
@@ -255,7 +254,6 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
                     if (value.getLabel() != null) {
                         //mPaint.setTextSize((int) (scaledPxSize * 3));
                         mPaint.setTextSize((float) (scaledTextSize*1.2));
-
                         mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
                         Rect bounds = new Rect();
                         mPaint.getTextBounds(value.getLabel(), 0, value.getLabel().length(), bounds);
@@ -298,7 +296,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
                     mPaint.setStrokeWidth(0);
                     if (value.getLabel() != null) {
                         mPaint.setStrokeWidth(0);
-                        mPaint.setTextSize((float) (scaledTextSize*1.5));
+                        mPaint.setTextSize((float) (scaledTextSize * 1.2));
                         mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
                         Rect bounds = new Rect();
                         mPaint.getTextBounds(value.getLabel(), 0, value.getLabel().length(), bounds);
@@ -328,7 +326,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
                     mPaint.setStrokeWidth(0);
                     if (value.getLabel() != null) {
                         mPaint.setStrokeWidth(0);
-                        mPaint.setTextSize((float) (scaledTextSize*1.5));
+                        mPaint.setTextSize((float) (scaledTextSize * 1.5));
                         mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
                         Rect bounds = new Rect();
                         mPaint.getTextBounds(value.getLabel(), 0, value.getLabel().length(), bounds);
@@ -382,7 +380,7 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
             float py = endY + scaledPxSize;
             canvas.save();
             canvas.rotate(-45, px, py);
-            mPaint.setTextSize((float) (widthMultiplyer * scaledTextSize*0.8));
+            mPaint.setTextSize((float) (scaledTextSize*0.8));
             mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
             mPaint.setFakeBoldText(true);
             mPaint.setTextAlign(Paint.Align.RIGHT);
@@ -394,11 +392,11 @@ public class PointsWithLabelGraphSeries<E extends DataPointWithLabelInterface> e
             float py = endY - scaledPxSize;
             canvas.save();
             canvas.rotate(-45, px, py);
-            mPaint.setTextSize((float) (widthMultiplyer * scaledTextSize*0.8));
+            mPaint.setTextSize((float) (scaledTextSize*0.8));
             mPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
             mPaint.setFakeBoldText(true);
             canvas.drawText(value.getLabel(), px + scaledPxSize, py, mPaint);
             canvas.restore();
         }
     }
-} 
+}
