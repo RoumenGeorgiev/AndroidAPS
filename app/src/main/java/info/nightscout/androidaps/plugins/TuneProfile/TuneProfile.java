@@ -72,6 +72,7 @@ public class TuneProfile implements PluginBase {
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
     public static Profile profile;
     public static List<Double> tunedBasals = new ArrayList<Double>();
+    public static List<Double> basalsResult = new ArrayList<Double>();
     public List<BgReading> glucose_data = new ArrayList<BgReading>();
     public List<BgReading> basalGlucose;
     public static List<Treatment> treatments;
@@ -642,7 +643,7 @@ public class TuneProfile implements PluginBase {
             return new AutosensResult();
         }
 
-        info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData current = IobCobCalculatorPlugin.getLastAutosensData();
+        info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData current = IobCobCalculatorPlugin.getLastAutosensData("Request from TuneProfile");
         if (current == null) {
             log.debug("No current autosens data available");
             return new AutosensResult();
@@ -918,6 +919,26 @@ public class TuneProfile implements PluginBase {
         return targets;
     }
 
+    public static String result(int daysBack){
+        basalsResultInit();
+        if(daysBack < 1){
+            return "Sorry I cannot do it for less than 1 day!";
+        } else {
+            for (int i = daysBack; i > 0; i--) {
+                tunedBasalsInit();
+                basicResult(i);
+                for(int ii=0; ii<24; ii++){
+                    log.debug(" basalsResult adding for "+ii+" value is "+basalsResult.get(ii)+" adding "+tunedBasals.get(ii));
+                    basalsResult.set(ii, (basalsResult.get(ii) + tunedBasals.get(ii)));
+                }
+            }
+        }
+        //
+        for(int i=0; i<24;i++){
+            basalsResult.set(i, basalsResult.get(i)/daysBack);
+        }
+            return displayBasalsResult();
+    }
 
     public static String basicResult(int daysBack) {
         // get some info and spit out a suggestion
@@ -946,6 +967,7 @@ public class TuneProfile implements PluginBase {
         String basicResult = "";
         double deviation = 0d;
         double netDeviation = 0d;
+
         tunedBasalsInit();
         getPlugin().createBucketedData(endTime);
         log.debug("CheckPoint 12-8-1 bucketed_data size "+bucketed_data.size()+ " end is "+new Date(endTime));
@@ -992,7 +1014,7 @@ public class TuneProfile implements PluginBase {
 
                 if (autosensData != null) {
                     deviation += autosensData.deviation;
-                    log.debug("Dev is:"+deviation+" at "+new Date(autosensData.time).toLocaleString());
+//                    log.debug("Dev is:"+deviation+" at "+new Date(autosensData.time).toLocaleString());
                     counter++;
                 } //else
 //                    log.debug("CheckPoint 6-3 Cannot get autosens data for "+time);
@@ -1000,7 +1022,7 @@ public class TuneProfile implements PluginBase {
             }
             // use net dev not average
             netDeviation = deviation;
-            log.debug("netDeviation "+netDeviation);
+            log.debug("netDeviation at "+i+" "+netDeviation);
             // calculate how much less or additional basal insulin would have been required to eliminate the deviations
             // only apply 20% of the needed adjustment to keep things relatively stable
             basalNeeded = 0.2 * netDeviation / isf;
@@ -1098,21 +1120,39 @@ public class TuneProfile implements PluginBase {
     public static String displayBasalsResult(){
         String result = "";
         for(int i=0;i<24; i++){
-            result += "\n"+i+" | "+getBasal(i)+" -> "+tunedBasals.get(i);
+            result += "\n"+i+" | "+getBasal(i)+" -> "+basalsResult.get(i);
         }
         return result;
     }
 
     public static void tunedBasalsInit(){
         // initialize tunedBasals if
-            if(tunedBasals.isEmpty()) {
-                for (int i = 0; i < 24; i++) {
-                    tunedBasals.add(getBasal(i));
-                }
-            } else
-                for (int i = 0; i < 24; i++) {
-                    tunedBasals.set(i, getBasal(i));
-                }
+//        if(tunedBasals.isEmpty()) {
+        log.debug("TunedBasals is called!!!");
+            for (int i = 0; i < 24; i++) {
+                tunedBasals.set(i, getBasal(i));
+            }
+//        } else {
+//            log.debug("TuendBasals is called but list is not empty!!!");
+//            for (int i = 0; i < 24; i++) {
+                //tunedBasals.set(i, getBasal(i));
+//            }
+//        }
+    }
+
+    public static void basalsResultInit(){
+        // initialize basalsResult if
+        log.debug(" basalsResult init");
+        if(basalsResult.isEmpty()) {
+            for (int i = 0; i < 24; i++) {
+                basalsResult.add(0d);
+            }
+        } else {
+            for (int i = 0; i < 24; i++) {
+                basalsResult.set(i, 0d);
+            }
+        }
+
     }
 
     public static Integer secondsFromMidnight(long date) {
