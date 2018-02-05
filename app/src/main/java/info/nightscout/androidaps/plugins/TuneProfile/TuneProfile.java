@@ -916,6 +916,7 @@ public class TuneProfile implements PluginBase {
     }
 
     public static String result(int daysBack){
+        //TODO: FIX going back 1 day more
         basalsResultInit();
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
