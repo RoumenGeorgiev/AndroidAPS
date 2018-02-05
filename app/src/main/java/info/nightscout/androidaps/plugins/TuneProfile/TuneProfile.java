@@ -738,7 +738,6 @@ public class TuneProfile implements PluginBase {
     }
 
     private void calculateSensitivityData(long startTime, long endTime) {
-//        log.debug("CheckPoint 12-8 bucketed data is now "+bucketed_data.size());
         if (MainApp.getConfigBuilder() == null)
             return; // app still initializing
         if (MainApp.getConfigBuilder().getProfile() == null)
@@ -752,7 +751,7 @@ public class TuneProfile implements PluginBase {
         synchronized (dataLock) {
 
             if (bucketed_data == null || bucketed_data.size() < 3) {
-                log.debug("CheckPoint 12-8-1 no bucketed data exiting calculateSensitivityData");
+//                log.debug("CheckPoint 12-8-1 no bucketed data exiting calculateSensitivityData");
                 return;
             }
 
@@ -866,8 +865,6 @@ public class TuneProfile implements PluginBase {
 //                log.debug("CheckPoint 7-2 calculated ratio is "+autosensData.autosensRatio);
             }
         }
-        // MainApp.bus().post(new EventAutosensCalculationFinished());
-        //log.debug("Releasing calculateSensitivityData");
     }
 
 
@@ -934,7 +931,7 @@ public class TuneProfile implements PluginBase {
         }
         //
         for(int i=0; i<24;i++){
-            basalsResult.set(i, basalsResult.get(i)/daysBack);
+            basalsResult.set(i, round(basalsResult.get(i)/daysBack, 3));
         }
             return displayBasalsResult();
     }
@@ -1109,7 +1106,10 @@ public class TuneProfile implements PluginBase {
                 tunedBasals.set(ii, round(tunedBasals.get(ii),3));
                 log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii));
             }
-            if (averageBG > 0) return averageBG + "\n" + displayBasalsResult();
+            if (averageBG > 0){
+                log.debug("Tuning from "+new Date(starttime).toLocaleString()+" to "+new Date(endTime).toLocaleString()+" took "+((System.currentTimeMillis()-now)/1000L)+" s");
+                return averageBG + "\n" + displayBasalsResult();
+            }
             else return "No BG data!(basicResult()";
 
     }

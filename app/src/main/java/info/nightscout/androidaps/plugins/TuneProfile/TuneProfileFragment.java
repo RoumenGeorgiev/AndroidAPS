@@ -59,9 +59,9 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     @Override
     public void onClick(View view) {
         Date lastRun = new Date();
-        resultView.setText(TuneProfile.result(1));
+        resultView.setText(TuneProfile.result(5));
         // lastrun in minutes ???
-        //profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF()+"\nTargets:"+TuneProfile.getTargets());
+        warningView.setText("You already pressed RUN - NO WARNING NEEDED!");
         lastRunView.setText(""+lastRun.toLocaleString());
         //updateGUI();
     }
@@ -74,11 +74,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
                 @Override
                 public void run() {
                     TuneProfile tuneProfile = new TuneProfile();
-                    //profileView.setText(TuneProfile.profile.getBasalList() != null ? TuneProfile.profile.getBasalList() : "");
-                    //glucoseDataView.setText(TuneProfile.getPlugin().averageGlucoseString(1));
+                    warningView.setText("Don't run tune for more than 5 days back! It will cause app crashesh and too much data usage");
                     resultView.setText("Press run");
-                    //treatmentsView.setText(LoopPlugin.lastRun.setByPump != null ? LoopPlugin.lastRun.setByPump.toSpanned() : "");
-                    //lastRunView.setText(LoopPlugin.lastRun.lastAPSRun != null && LoopPlugin.lastRun.lastAPSRun.getTime() != 0 ? LoopPlugin.lastRun.lastAPSRun.toLocaleString() : "");
                 }
             });
     }
