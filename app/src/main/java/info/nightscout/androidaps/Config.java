@@ -11,6 +11,7 @@ public class Config {
     // PLUGINS
     public static final boolean NSCLIENT = BuildConfig.NSCLIENTOLNY;
     public static final boolean G5UPLOADER = BuildConfig.G5UPLOADER;
+    public static final boolean PUMPCONTROL = BuildConfig.PUMPCONTROL;
 
     public static final boolean DANAR = BuildConfig.PUMPDRIVERS;
 
@@ -22,6 +23,8 @@ public class Config {
 
     public static final boolean SMSCOMMUNICATORENABLED = !BuildConfig.NSCLIENTOLNY && !BuildConfig.G5UPLOADER;
 
+
+    public static final boolean displayDeviationSlope = true;
 
     public static final boolean detailedLog = true;
     public static final boolean logFunctionCalls = true;

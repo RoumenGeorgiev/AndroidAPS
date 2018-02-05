@@ -44,16 +44,18 @@ import info.nightscout.androidaps.plugins.NSClientInternal.NSClientInternalPlugi
 import info.nightscout.androidaps.plugins.NSClientInternal.receivers.AckAlarmReceiver;
 import info.nightscout.androidaps.plugins.OpenAPSAMA.OpenAPSAMAPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSMA.OpenAPSMAPlugin;
+import info.nightscout.androidaps.plugins.OpenAPSSMB.OpenAPSSMBPlugin;
 import info.nightscout.androidaps.plugins.Overview.OverviewPlugin;
 import info.nightscout.androidaps.plugins.Persistentnotification.PersistentNotificationPlugin;
 import info.nightscout.androidaps.plugins.ProfileCircadianPercentage.CircadianPercentageProfileFragment;
-import info.nightscout.androidaps.plugins.ProfileLocal.LocalProfileFragment;
+import info.nightscout.androidaps.plugins.ProfileLocal.LocalProfilePlugin;
 import info.nightscout.androidaps.plugins.ProfileNS.NSProfilePlugin;
 import info.nightscout.androidaps.plugins.ProfileSimple.SimpleProfilePlugin;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPlugin;
 import info.nightscout.androidaps.plugins.PumpDanaRKorean.DanaRKoreanPlugin;
 import info.nightscout.androidaps.plugins.PumpDanaRS.DanaRSPlugin;
 import info.nightscout.androidaps.plugins.PumpDanaRv2.DanaRv2Plugin;
+import info.nightscout.androidaps.plugins.PumpInsight.InsightPumpPlugin;
 import info.nightscout.androidaps.plugins.PumpMDI.MDIPlugin;
 import info.nightscout.androidaps.plugins.PumpVirtual.VirtualPumpPlugin;
 import info.nightscout.androidaps.plugins.SensitivityAAPS.SensitivityAAPSPlugin;
@@ -130,14 +132,16 @@ public class MainApp extends Application {
             if (Config.DANAR) pluginsList.add(DanaRv2Plugin.getPlugin());
             if (Config.DANAR) pluginsList.add(DanaRSPlugin.getPlugin());
             pluginsList.add(CareportalPlugin.getPlugin());
+            if (Config.DANAR) pluginsList.add(InsightPumpPlugin.getPlugin());
             if (Config.MDI) pluginsList.add(MDIPlugin.getPlugin());
             if (Config.VIRTUALPUMP) pluginsList.add(VirtualPumpPlugin.getPlugin());
             if (Config.APS) pluginsList.add(LoopPlugin.getPlugin());
             if (Config.APS) pluginsList.add(OpenAPSMAPlugin.getPlugin());
             if (Config.APS) pluginsList.add(OpenAPSAMAPlugin.getPlugin());
+            if (Config.APS) pluginsList.add(OpenAPSSMBPlugin.getPlugin());
             pluginsList.add(NSProfilePlugin.getPlugin());
             if (Config.OTHERPROFILES) pluginsList.add(SimpleProfilePlugin.getPlugin());
-            if (Config.OTHERPROFILES) pluginsList.add(LocalProfileFragment.getPlugin());
+            if (Config.OTHERPROFILES) pluginsList.add(LocalProfilePlugin.getPlugin());
             if (Config.OTHERPROFILES)
                 pluginsList.add(CircadianPercentageProfileFragment.getPlugin());
             pluginsList.add(TreatmentsPlugin.getPlugin());
@@ -167,10 +171,16 @@ public class MainApp extends Application {
             MainApp.getConfigBuilder().initialize();
         }
         NSUpload.uploadAppStart();
-        if (MainApp.getConfigBuilder().isClosedModeEnabled())
+        if (Config.NSCLIENT)
+            Answers.getInstance().logCustom(new CustomEvent("AppStart-NSClient"));
+        else if (Config.G5UPLOADER)
+            Answers.getInstance().logCustom(new CustomEvent("AppStart-G5Uploader"));
+        else if (Config.PUMPCONTROL)
+            Answers.getInstance().logCustom(new CustomEvent("AppStart-PumpControl"));
+        else if (MainApp.getConfigBuilder().isClosedModeEnabled())
             Answers.getInstance().logCustom(new CustomEvent("AppStart-ClosedLoop"));
         else
-            Answers.getInstance().logCustom(new CustomEvent("AppStart"));
+            Answers.getInstance().logCustom(new CustomEvent("AppStart-OpenLoop"));
 
         new Thread(new Runnable() {
             @Override
@@ -223,6 +233,14 @@ public class MainApp extends Application {
 
     public static Bus bus() {
         return sBus;
+    }
+
+    public static String gs(int id) {
+        return sResources.getString(id);
+    }
+
+    public static String gs(int id, Object... args) {
+        return sResources.getString(id, args);
     }
 
     public static MainApp instance() {

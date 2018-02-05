@@ -7,7 +7,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.support.v4.app.TaskStackBuilder;
-import android.support.v7.app.NotificationCompat;
+import android.support.v4.app.NotificationCompat;
 
 import com.squareup.otto.Subscribe;
 
@@ -139,8 +139,8 @@ public class PersistentNotificationPlugin implements PluginBase {
             }
         }
 
-        if (MainApp.getConfigBuilder().isTempBasalInProgress()) {
-            TemporaryBasal activeTemp = MainApp.getConfigBuilder().getTempBasalFromHistory(System.currentTimeMillis());
+        TemporaryBasal activeTemp = MainApp.getConfigBuilder().getTempBasalFromHistory(System.currentTimeMillis());
+        if (activeTemp != null) {
             line1 += "  " + activeTemp.toStringShort();
         }
 

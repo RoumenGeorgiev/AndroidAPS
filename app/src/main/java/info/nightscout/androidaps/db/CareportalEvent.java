@@ -258,4 +258,8 @@ public class CareportalEvent implements DataPointWithLabelInterface {
     public int getSecondColor() {
         return 0;
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 9fd8ad87052e6fe8bf6f855d4a9e3148bc73216d

@@ -239,4 +239,8 @@ public class BgReading implements DataPointWithLabelInterface {
         return isaCOBPrediction || isCOBPrediction || isIOBPrediction || isUAMPrediction || isZTPrediction;
     }
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 9fd8ad87052e6fe8bf6f855d4a9e3148bc73216d
