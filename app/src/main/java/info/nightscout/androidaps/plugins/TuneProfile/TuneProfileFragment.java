@@ -32,9 +32,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     private static Logger log = LoggerFactory.getLogger(TuneProfileFragment.class);
 
     Button runTuneNowButton;
-    TextView profileView;
-    TextView glucoseDataView;
-    TextView treatmentsView;
+    TextView warningView;
+    TextView resultView;
     TextView lastRunView;
     //TuneProfile tuneProfile = new TuneProfile();
 
@@ -43,9 +42,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         try {
             View view = inflater.inflate(R.layout.tuneprofile_fragment, container, false);
 
-            profileView = (TextView) view.findViewById(R.id.tune_profile);
-            glucoseDataView = (TextView) view.findViewById(R.id.tune_glucose);
-            treatmentsView = (TextView) view.findViewById(R.id.tune_treatments);
+            warningView = (TextView) view.findViewById(R.id.tune_warning);
+            resultView = (TextView) view.findViewById(R.id.tune_result);
             lastRunView = (TextView) view.findViewById(R.id.tune_lastrun);
             runTuneNowButton = (Button) view.findViewById(R.id.tune_run);
             runTuneNowButton.setOnClickListener(this);
@@ -61,12 +59,10 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     @Override
     public void onClick(View view) {
         Date lastRun = new Date();
-        glucoseDataView.setText(TuneProfile.result(5));
+        resultView.setText(TuneProfile.result(1));
         // lastrun in minutes ???
-        profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF()+"\nTargets:"+TuneProfile.getTargets());
+        //profileView.setText(""+TuneProfile.getBasal(9)+"\nISF is "+TuneProfile.getISF()+"\nTargets:"+TuneProfile.getTargets());
         lastRunView.setText(""+lastRun.toLocaleString());
-        //treatmentsView.setText(""+TuneProfile.numberOfTreatments(System.currentTimeMillis()- 24*60*60*1000L, System.currentTimeMillis()));
-        //TuneProfile.getAutosensData();
         //updateGUI();
     }
 
@@ -80,7 +76,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
                     TuneProfile tuneProfile = new TuneProfile();
                     //profileView.setText(TuneProfile.profile.getBasalList() != null ? TuneProfile.profile.getBasalList() : "");
                     //glucoseDataView.setText(TuneProfile.getPlugin().averageGlucoseString(1));
-                    glucoseDataView.setText("Press run");
+                    resultView.setText("Press run");
                     //treatmentsView.setText(LoopPlugin.lastRun.setByPump != null ? LoopPlugin.lastRun.setByPump.toSpanned() : "");
                     //lastRunView.setText(LoopPlugin.lastRun.lastAPSRun != null && LoopPlugin.lastRun.lastAPSRun.getTime() != 0 ? LoopPlugin.lastRun.lastAPSRun.toLocaleString() : "");
                 }

@@ -275,19 +275,19 @@ public class TuneProfile implements PluginBase {
         // Created by Rumen for timesensitive autosensCalc
 
         synchronized (dataLock) {
-            log.debug("CheckPoint 10-1 - glucose_data "+glucose_data.size()+" records");
+//            log.debug("CheckPoint 10-1 - glucose_data "+glucose_data.size()+" records");
             getGlucoseData(endTime- 24*60*60*1000l, endTime);
-            log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
+//            log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
             if (glucose_data == null || glucose_data.size() < 3) {
 
                 bucketed_data = null;
-                log.debug("CheckPoint 10 - no glucose_data");
+//                log.debug("CheckPoint 10 - no glucose_data");
                 return;
             }
-            log.debug("CheckPoint 11");
+//            log.debug("CheckPoint 11");
             bucketed_data = new ArrayList<>();
             long currentTime = glucose_data.get(0).date + 5 * 60 * 1000 - glucose_data.get(0).date % (5 * 60 * 1000) - 5 * 60 * 1000L;
-            log.debug("CheckPoint 11-1 First reading: " + new Date(currentTime).toLocaleString());
+//            log.debug("CheckPoint 11-1 First reading: " + new Date(currentTime).toLocaleString());
 
             while (true) {
                 // test if current value is older than current time
@@ -304,7 +304,7 @@ public class TuneProfile implements PluginBase {
                     }
 
                 }
-                log.debug("CheckPoint 11-2-1  bucketed_data.size" + bucketed_data.size());
+//                log.debug("CheckPoint 11-2-1  bucketed_data.size" + bucketed_data.size());
                 break;
             }
                /* BgReading newer = findNewer(glucose_data, currentTime);
@@ -561,7 +561,7 @@ public class TuneProfile implements PluginBase {
                 return null;
             Long previous = findPreviousTimeFromBucketedData(time);
             if (previous == null) {
-                log.debug("CheckPoint 4 - no previous time in bucketed_data "+new Date(time));
+//                log.debug("CheckPoint 4 - no previous time in bucketed_data "+new Date(time));
                 return null;
             }
             time = roundUpTime(previous);
@@ -639,13 +639,12 @@ public class TuneProfile implements PluginBase {
         long now = System.currentTimeMillis();
 
         if (autosensDataTable == null || autosensDataTable.size() < 4) {
-            log.debug("No autosens data available");
             return new AutosensResult();
         }
 
         info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData current = IobCobCalculatorPlugin.getLastAutosensData("Request from TuneProfile");
         if (current == null) {
-            log.debug("No current autosens data available");
+            //log.debug("No current autosens data available");
             return new AutosensResult();
         }
 
@@ -875,12 +874,12 @@ public class TuneProfile implements PluginBase {
     @Nullable
     public static AutosensData getLastAutosensData() {
         if (autosensDataTable.size() < 1) {
-            log.debug("CheckPoint 13-1 autosensDataTable is too small");
+//            log.debug("CheckPoint 13-1 autosensDataTable is too small");
             return null;
         }
         AutosensData data = autosensDataTable.valueAt(autosensDataTable.size() - 1);
         if (data.time < System.currentTimeMillis() - 11 * 60 * 1000) {
-            log.debug("CheckPoint 13-2 latest autosensData is too old"+new Date(data.time).toString());
+//            log.debug("CheckPoint 13-2 latest autosensData is too old"+new Date(data.time).toString());
             return data;
             //return null;
         } else {
@@ -1006,10 +1005,10 @@ public class TuneProfile implements PluginBase {
                 if(autosensData == null) {
                     autosensData = getLastAutosensData();
 //                    log.debug("CheckPoint 6-5 - autosensData is "+((time - autosensData.time)/(60*1000L))+" min older");
-                    if(time - autosensData.time < 0){
+//                    if(time - autosensData.time < 0){
                         // Autosens is newer than needed
 
-                    }
+//                    }
                 }
 
                 if (autosensData != null) {
@@ -1127,17 +1126,16 @@ public class TuneProfile implements PluginBase {
 
     public static void tunedBasalsInit(){
         // initialize tunedBasals if
-//        if(tunedBasals.isEmpty()) {
-        log.debug("TunedBasals is called!!!");
+        if(tunedBasals.isEmpty()) {
+            log.debug("TunedBasals is called!!!");
+            for (int i = 0; i < 24; i++) {
+                tunedBasals.add(getBasal(i));
+            }
+        } else {
             for (int i = 0; i < 24; i++) {
                 tunedBasals.set(i, getBasal(i));
             }
-//        } else {
-//            log.debug("TuendBasals is called but list is not empty!!!");
-//            for (int i = 0; i < 24; i++) {
-                //tunedBasals.set(i, getBasal(i));
-//            }
-//        }
+        }
     }
 
     public static void basalsResultInit(){
