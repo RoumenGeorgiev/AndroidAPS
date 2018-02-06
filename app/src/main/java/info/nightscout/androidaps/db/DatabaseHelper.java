@@ -462,7 +462,22 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
         return new ArrayList<BgReading>();
     }
 
-    
+    public List<BgReading> getBgreadingsDataFromTimeToTime(long from, long to, boolean ascending) {
+        try {
+            Dao<BgReading, Long> daoBgreadings = getDaoBgReadings();
+            List<BgReading> bgReadings;
+            QueryBuilder<BgReading, Long> queryBuilder = daoBgreadings.queryBuilder();
+            queryBuilder.orderBy("date", ascending);
+            Where where = queryBuilder.where();
+            where.ge("date", from).and().le("date", to).and().gt("value", 38).and().eq("isValid", true);
+            PreparedQuery<BgReading> preparedQuery = queryBuilder.prepare();
+            bgReadings = daoBgreadings.query(preparedQuery);
+            return bgReadings;
+        } catch (SQLException e) {
+            log.error("Unhandled exception", e);
+        }
+        return new ArrayList<BgReading>();
+    }
 
     public List<BgReading> getAllBgreadingsDataFromTime(long mills, boolean ascending) {
         try {
