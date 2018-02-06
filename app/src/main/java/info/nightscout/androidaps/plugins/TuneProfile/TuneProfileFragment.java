@@ -2,11 +2,12 @@ package info.nightscout.androidaps.plugins.TuneProfile;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.NumberPicker;
 import android.widget.TextView;
 
 import com.crashlytics.android.Crashlytics;
@@ -21,8 +22,6 @@ import java.util.Date;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.plugins.Common.SubscriberFragment;
-import info.nightscout.androidaps.plugins.Loop.LoopFragment;
-import info.nightscout.androidaps.plugins.Loop.LoopPlugin;
 
 /**
  * Created by Rumen Georgiev on 1/29/2018.
@@ -35,6 +34,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     TextView warningView;
     TextView resultView;
     TextView lastRunView;
+    EditText tune_days;
     //TuneProfile tuneProfile = new TuneProfile();
 
     @Override
@@ -46,6 +46,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
             resultView = (TextView) view.findViewById(R.id.tune_result);
             lastRunView = (TextView) view.findViewById(R.id.tune_lastrun);
             runTuneNowButton = (Button) view.findViewById(R.id.tune_run);
+            tune_days = (EditText) view.findViewById(R.id.tune_days);
             runTuneNowButton.setOnClickListener(this);
 
             //updateGUI();
@@ -59,7 +60,11 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     @Override
     public void onClick(View view) {
         Date lastRun = new Date();
-        resultView.setText(TuneProfile.result(5));
+        int daysBack =  Integer.parseInt(tune_days.getText().toString());
+        if(daysBack > 0 && daysBack < 10)
+            resultView.setText(TuneProfile.result(daysBack));
+        else
+            resultView.setText("Set days to bigger than 0 an lower than 10!!!");
         // lastrun in minutes ???
         warningView.setText("You already pressed RUN - NO WARNING NEEDED!");
         lastRunView.setText(""+lastRun.toLocaleString());

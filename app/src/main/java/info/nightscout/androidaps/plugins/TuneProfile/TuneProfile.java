@@ -642,7 +642,7 @@ public class TuneProfile implements PluginBase {
             return new AutosensResult();
         }
 
-        info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData current = IobCobCalculatorPlugin.getLastAutosensData("Request from TuneProfile");
+        AutosensData current = getLastAutosensData();
         if (current == null) {
             //log.debug("No current autosens data available");
             return new AutosensResult();
@@ -1128,7 +1128,7 @@ public class TuneProfile implements PluginBase {
     public static void tunedBasalsInit(){
         // initialize tunedBasals if
         if(tunedBasals.isEmpty()) {
-            log.debug("TunedBasals is called!!!");
+            //log.debug("TunedBasals is called!!!");
             for (int i = 0; i < 24; i++) {
                 tunedBasals.add(getBasal(i));
             }
@@ -1141,7 +1141,7 @@ public class TuneProfile implements PluginBase {
 
     public static void basalsResultInit(){
         // initialize basalsResult if
-        log.debug(" basalsResult init");
+//        log.debug(" basalsResult init");
         if(basalsResult.isEmpty()) {
             for (int i = 0; i < 24; i++) {
                 basalsResult.add(0d);
