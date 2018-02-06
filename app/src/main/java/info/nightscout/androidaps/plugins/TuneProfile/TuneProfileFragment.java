@@ -61,10 +61,10 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
     public void onClick(View view) {
         Date lastRun = new Date();
         int daysBack =  Integer.parseInt(tune_days.getText().toString());
-        if(daysBack > 0 && daysBack < 10)
+        if(daysBack > 0 && daysBack < 11)
             resultView.setText(TuneProfile.result(daysBack));
         else
-            resultView.setText("Set days to bigger than 0 an lower than 10!!!");
+            resultView.setText("Set days between 1 and 10!!!");
         // lastrun in minutes ???
         warningView.setText("You already pressed RUN - NO WARNING NEEDED!");
         lastRunView.setText(""+lastRun.toLocaleString());

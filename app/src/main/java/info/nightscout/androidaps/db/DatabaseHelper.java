@@ -462,6 +462,8 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
         return new ArrayList<BgReading>();
     }
 
+    
+
     public List<BgReading> getAllBgreadingsDataFromTime(long mills, boolean ascending) {
         try {
             Dao<BgReading, Long> daoBgreadings = getDaoBgReadings();

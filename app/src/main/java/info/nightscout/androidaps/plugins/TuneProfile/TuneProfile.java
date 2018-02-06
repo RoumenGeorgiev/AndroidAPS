@@ -1,6 +1,5 @@
 package info.nightscout.androidaps.plugins.TuneProfile;
 
-import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v4.util.LongSparseArray;
 
@@ -13,11 +12,8 @@ import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.BgReading;
 import info.nightscout.androidaps.db.Treatment;
 import info.nightscout.androidaps.interfaces.PluginBase;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensResult;
-import info.nightscout.androidaps.plugins.TuneProfile.AutosensData;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
-import info.nightscout.androidaps.plugins.IobCobCalculator.events.EventAutosensCalculationFinished;
 import info.nightscout.utils.Round;
 import info.nightscout.utils.SP;
 import info.nightscout.utils.SafeParse;
@@ -26,12 +22,9 @@ import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -74,11 +67,9 @@ public class TuneProfile implements PluginBase {
     public static List<Double> tunedBasals = new ArrayList<Double>();
     public static List<Double> basalsResult = new ArrayList<Double>();
     public List<BgReading> glucose_data = new ArrayList<BgReading>();
-    public List<BgReading> basalGlucose;
     public static List<Treatment> treatments;
-    private JSONArray mIobData;
-    private IobTotal iob;
     private static final Object dataLock = new Object();
+
     //copied from IobCobCalculator
     private static LongSparseArray<IobTotal> iobTable = new LongSparseArray<>(); // oldest at index 0
     private static volatile List<BgReading> bgReadings = null; // newest at index 0
@@ -939,12 +930,11 @@ public class TuneProfile implements PluginBase {
 
     public static String basicResult(int daysBack) {
         // get some info and spit out a suggestion
-        // TODO: if daysBack > 1 call it multiple times and do an average of the suggestion
         // TODO: Same function for ISF and CR
         // time now
         long now = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(now - (daysBack * 24 * 60 * 60 * 1000L));
+        c.setTimeInMillis(now - ((daysBack-1) * 24 * 60 * 60 * 1000L));
         c.set(Calendar.HOUR_OF_DAY, 0);
         c.set(Calendar.MINUTE, 0);
         c.set(Calendar.SECOND, 0);
