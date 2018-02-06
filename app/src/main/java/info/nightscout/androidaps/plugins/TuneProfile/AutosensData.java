@@ -39,7 +39,7 @@ public class AutosensData {
                 double sens = Profile.toMgdl(profile.getIsf(t.date), profile.getUnits());
                 double ic = profile.getIc(t.date);
                 min5minCarbImpact = t.carbs / (maxAbsorptionHours * 60 / 5) * sens / ic;
-                log.debug("Min 5m carbs impact for " + carbs + "g @" + new Date(t.date).toLocaleString() + " for " + maxAbsorptionHours + "h calculated to " + min5minCarbImpact + " ISF: " + sens + " IC: " + ic);
+                //log.debug("Min 5m carbs impact for " + carbs + "g @" + new Date(t.date).toLocaleString() + " for " + maxAbsorptionHours + "h calculated to " + min5minCarbImpact + " ISF: " + sens + " IC: " + ic);
             } else {
                 min5minCarbImpact = SP.getDouble("openapsama_min_5m_carbimpact", 3.0);
             }

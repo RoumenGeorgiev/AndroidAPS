@@ -18,7 +18,6 @@ import info.nightscout.utils.Round;
 import info.nightscout.utils.SP;
 import info.nightscout.utils.SafeParse;
 
-import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +68,7 @@ public class TuneProfile implements PluginBase {
     public List<BgReading> glucose_data = new ArrayList<BgReading>();
     public static List<Treatment> treatments;
     private static final Object dataLock = new Object();
+    private static double tunedISF = 0d;
 
     //copied from IobCobCalculator
     private static LongSparseArray<IobTotal> iobTable = new LongSparseArray<>(); // oldest at index 0
@@ -165,7 +165,7 @@ public class TuneProfile implements PluginBase {
         //get glucoseData for 1 day back
         long oneDayBack = end - 24 * 60 * 60 *1000L;
         glucose_data = MainApp.getDbHelper().getBgreadingsDataFromTime(oneDayBack, true);
-//        log.debug("CheckPoint 12-1 - glucose_data.size is "+glucose_data.size()+" from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
+//        log.debug("CheckPoint -121 - glucose_data.size is "+glucose_data.size()+" from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
         int initialSize = glucose_data.size();
         if(glucose_data.size() < 1) {
             // no BG data
@@ -234,7 +234,7 @@ public class TuneProfile implements PluginBase {
             log.debug("CheckPoint 7");
             createBucketedData5min(endTime);
         } else
-            log.debug("CheckPoint 8 - creating bucketedDataRecalculated(endTime)");
+            log.debug("CheckPoint 8 - creating bucketedDataRecalculated("+new Date(endTime).toLocaleString()+")");
             createBucketedDataRecalculated(endTime);
     }
 
@@ -907,7 +907,7 @@ public class TuneProfile implements PluginBase {
     }
 
     public static String result(int daysBack){
-        //TODO: FIX going back 1 day more
+        tunedISF = 0;
         basalsResultInit();
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
@@ -916,7 +916,7 @@ public class TuneProfile implements PluginBase {
                 tunedBasalsInit();
                 basicResult(i);
                 for(int ii=0; ii<24; ii++){
-                    log.debug(" basalsResult adding for "+ii+" value is "+basalsResult.get(ii)+" adding "+tunedBasals.get(ii));
+//                    log.debug(" basalsResult adding for "+ii+" value is "+basalsResult.get(ii)+" adding "+tunedBasals.get(ii));
                     basalsResult.set(ii, (basalsResult.get(ii) + tunedBasals.get(ii)));
                 }
             }
@@ -925,7 +925,11 @@ public class TuneProfile implements PluginBase {
         for(int i=0; i<24;i++){
             basalsResult.set(i, round(basalsResult.get(i)/daysBack, 3));
         }
-            return displayBasalsResult();
+            int devisor = 1;
+            if(profile.getUnits().equals("mmol"))
+                devisor = 18;
+            double isfResult = tunedISF / daysBack;
+            return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2);
     }
 
     public static String basicResult(int daysBack) {
@@ -946,7 +950,7 @@ public class TuneProfile implements PluginBase {
         int averageBG = 0;
         double basal;
         double basalNeeded = 0d;
-        double isf;
+        double isf = getISF();
         double target;
         double result;
         double sensitivity;
@@ -956,6 +960,7 @@ public class TuneProfile implements PluginBase {
         double netDeviation = 0d;
 
         tunedBasalsInit();
+        log.debug("CheckPoint 12-8-0 creating bucketed_data for "+new Date(endTime));
         getPlugin().createBucketedData(endTime);
         log.debug("CheckPoint 12-8-1 bucketed_data size "+bucketed_data.size()+ " end is "+new Date(endTime));
         getPlugin().calculateSensitivityData(starttime, endTime);
@@ -965,7 +970,7 @@ public class TuneProfile implements PluginBase {
 
         // Detecting sensitivity for the whole day
         //AutosensResult autosensResult = detectSensitivity(starttime, endTime);
-        AutosensResult autosensResult = new AutosensResult();
+//        AutosensResult autosensResult = new AutosensResult();
 //        log.debug("CheckPoint 7-12 sensitivity is "+autosensResult.ratio +" from "+new Date(starttime).toString()+" to "+new Date(endTime));
 
         for (int i = 0; i < 24; i++) {
@@ -1095,9 +1100,11 @@ public class TuneProfile implements PluginBase {
                     tunedBasals.set(ii, minRate);
                 }
                 tunedBasals.set(ii, round(tunedBasals.get(ii),3));
-                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii));
+                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii)+" ratio is "+autosensData.autosensRatio);
             }
             if (averageBG > 0){
+                tunedISF += isf * autosensData.autosensRatio;
+                log.debug("Tuned ISF is "+tunedISF);
                 log.debug("Tuning from "+new Date(starttime).toLocaleString()+" to "+new Date(endTime).toLocaleString()+" took "+((System.currentTimeMillis()-now)/1000L)+" s");
                 return averageBG + "\n" + displayBasalsResult();
             }
