@@ -182,6 +182,46 @@ public class TuneProfile implements PluginBase {
 
     }
 
+    public List<BgReading> getBGFromTo(long from, long to) {
+        List<BgReading> bg_data_temp = MainApp.getDbHelper().getBgreadingsDataFromTime(from, true);
+        List<BgReading> bg_data = new ArrayList<BgReading>();
+        int initialSize = bg_data_temp.size();
+        if(initialSize < 1) {
+            // no BG data return empty list
+            return new ArrayList<BgReading>();
+        }
+        int counter = 0;
+        long location = from;
+        long next5min = from + 5 * 60 * 1000L;
+        for (int i = 0; i < initialSize-1; i++) {
+            if (bg_data_temp.get(i).value > 38) {
+                if(bg_data_temp.get(i).date > from && bg_data_temp.get(i).date < to) {
+                    bg_data.add(bg_data_temp.get(i));
+                    counter++;
+                }
+            }
+        }
+        if(bg_data.size()<1)
+            return new ArrayList<BgReading>();
+        for (int i = 0; i < bg_data.size()-1; i++) {
+            if(bg_data_temp.get(i).date > next5min){
+                location = next5min;
+                next5min = location + 5*60*1000L;
+            }
+
+            if(bg_data.get(i).date > location && bg_data.get(i).date < next5min) {
+                bg_data.remove(i);
+                counter++;
+            }
+        }
+
+        bg_data_temp = new ArrayList<BgReading>();
+        return bg_data;
+
+    }
+
+
+
     public void getTreatments(long end){
         //get treatments 24h back
         //double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
@@ -268,7 +308,7 @@ public class TuneProfile implements PluginBase {
 
         synchronized (dataLock) {
 //            log.debug("CheckPoint 10-1 - glucose_data "+glucose_data.size()+" records");
-            getGlucoseData(endTime- 24*60*60*1000l, endTime);
+            glucose_data = getBGFromTo(endTime- 24*60*60*1000l, endTime);
 //            log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
             if (glucose_data == null || glucose_data.size() < 3) {
 
@@ -456,7 +496,7 @@ public class TuneProfile implements PluginBase {
     public synchronized Integer averageGlucose(long start, long end){
         // initialize glucose_data
         if(glucose_data.size() < 2)
-            getGlucoseData(start, end);
+            getBGFromTo(start, end);
 //        log.debug("CheckPoint 12-4 glucose_data.size is "+glucose_data.size()+" from "+new Date(start).toString()+" to "+new  Date(end).toString());
         if(glucose_data.size() < 1)
             // no BG data
@@ -466,7 +506,7 @@ public class TuneProfile implements PluginBase {
         int avgGlucose = 0;
         long milisMax = end;
         long milisMin = start;
-        trimGlucose(start, end);
+        //trimGlucose(start, end);
         for (int i = 1; i < glucose_data.size(); i++) {
             if (glucose_data.get(i).value > 38 || glucose_data.get(i).date < milisMax || glucose_data.get(i).date > milisMin) {
                 if(glucose_data.get(i).date == glucose_data.get(i-1).date)
@@ -730,7 +770,7 @@ public class TuneProfile implements PluginBase {
     }
 
     private void calculateSensitivityData(long startTime, long endTime) {
-        if (MainApp.getConfigBuilder() == null)
+        if (MainApp.getConfigBuilder() == null || bucketed_data == null)
             return; // app still initializing
         if (MainApp.getConfigBuilder().getProfile() == null)
             return; // app still initializing
@@ -850,7 +890,7 @@ public class TuneProfile implements PluginBase {
 
                 previous = autosensData;
                 Date entering = new Date(bgTime);
-                log.debug("CheckPoint 7-2 putting something in autosesnsDataTable - "+entering.toString()+" - "+autosensData.autosensRatio);
+//                log.debug("CheckPoint 7-2 putting something in autosesnsDataTable - "+entering.toString()+" - "+autosensData.autosensRatio);
                 autosensDataTable.put(bgTime, autosensData);
 //                autosensData.autosensRatio = detectSensitivity(oldestTimeWithData, bgTime).ratio;
                 autosensData.autosensRatio = detectSensitivity(startTime, bgTime).ratio;
@@ -889,9 +929,9 @@ public class TuneProfile implements PluginBase {
             }
         }
         // Trying to get new bucketed data
-        log.debug("CheckPoint 4-2 - all dates in bucketed data are bigger then time "+new Date(time));
-        log.debug("CheckPoint 4-2 - first date is "+new Date(bucketed_data.get(0).date));
-        log.debug("CheckPoint 4-2 - last date is "+new Date(bucketed_data.get(bucketed_data.size()-1).date));
+        log.debug("CheckPoint 4-2 - all dates are > "+new Date(time));
+//        log.debug("CheckPoint 4-2 - first date is "+new Date(bucketed_data.get(0).date));
+//        log.debug("CheckPoint 4-2 - last date is "+new Date(bucketed_data.get(bucketed_data.size()-1).date));
         return null;
     }
 
@@ -908,9 +948,42 @@ public class TuneProfile implements PluginBase {
         return targets;
     }
 
+    public static String bgReadings(int daysBack){
+        String result = "";
+        long now = System.currentTimeMillis();
+
+        for(int i=daysBack; i>0; i--){
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(now - ((i-1) * 24 * 60 * 60 * 1000L));
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            // midnight
+            long endTime = c.getTimeInMillis();
+            long startTime = endTime - (24 * 60 * 60 * 1000L);
+            log.debug("Getting BG for "+new Date(startTime).toLocaleString());
+            result += "\nfor "+new Date(startTime).getDate()+" "+new Date(startTime).getMonth()+" "+getPlugin().getBGFromTo(startTime, endTime).size()+" values";
+//            log.debug("\nEarliest is:"+new Date(getPlugin().getBGFromTo(startTime, endTime).get(0).date));
+        }
+
+        return result;
+
+    }
+
     public static String result(int daysBack){
         tunedISF = 0;
         basalsResultInit();
+        long now = System.currentTimeMillis();
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(now - ((daysBack-1) * 24 * 60 * 60 * 1000L));
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        // midnight
+        long endTime = c.getTimeInMillis();
+        long starttime = endTime - (24 * 60 * 60 * 1000L);
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
         } else {
@@ -937,6 +1010,7 @@ public class TuneProfile implements PluginBase {
     String basicResult(int daysBack) {
         // get some info and spit out a suggestion
         // TODO: Same function for ISF and CR
+        // TODO: Find a way to ask NSClient to fetch SGV for that day
         // time now
         long now = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
@@ -956,12 +1030,19 @@ public class TuneProfile implements PluginBase {
         double netDeviation = 0d;
 
         tunedBasalsInit();
-        log.debug("CheckPoint 12-8-0 creating bucketed_data for "+new Date(endTime));
+        log.debug("CheckPoint 12-8-0 creating bucketed_data for "+new Date(endTime).toLocaleString());
         createBucketedData(endTime);
-        log.debug("CheckPoint 12-8-1 bucketed_data size "+bucketed_data.size()+ " end is "+new Date(endTime));
+        if(bucketed_data != null) {
+            // No data return same basals
+            log.debug("CheckPoint 12-8-1 bucketed_data size " + bucketed_data.size() + " end is " + new Date(endTime).toLocaleString());
+            return "No BG data for this day";
+        }
         calculateSensitivityData(starttime, endTime);
-        log.debug("CheckPoint 12-8-2 calculated sensitivityDataTable size "+autosensDataTable.size()+ " end is "+new Date(endTime));
-        //getPlugin().getGlucoseData(starttime, endTime);
+        if(autosensDataTable.size() >0 ) {
+            log.debug("CheckPoint 12-8-2 calculated sensitivityDataTable size " + autosensDataTable.size() + " end is " + new Date(endTime));
+            log.debug("CheckPoint 12-8-2 start:" + new Date(autosensDataTable.valueAt(0).time).toLocaleString());
+            log.debug("CheckPoint 12-8-2 end  :" + new Date(autosensDataTable.valueAt(autosensDataTable.size()-1).time).toLocaleString());
+        }
         AutosensData autosensData = getAutosensData(endTime);
 
         // Detecting sensitivity for the whole day
@@ -973,7 +1054,7 @@ public class TuneProfile implements PluginBase {
 
             // get average BG
             //log.debug("CheckPoint 12-3 - getting glucose");
-            getPlugin().getGlucoseData(starttime, endTime);
+            getPlugin().getBGFromTo(starttime, endTime);
             //log.debug("CheckPoint 12-3 - records "+getPlugin().glucose_data.size());
             averageBG = getPlugin().averageGlucose(starttime + (i * 60 * 60 * 1000l), starttime + (i + 1) * 60 * 60 * 1000L);
             // get ISF
@@ -993,11 +1074,8 @@ public class TuneProfile implements PluginBase {
                 autosensData = getAutosensData(time);
                 if(autosensData == null) {
                     autosensData = getLastAutosensData();
-//                    log.debug("CheckPoint 6-5 - autosensData is "+((time - autosensData.time)/(60*1000L))+" min older");
-//                    if(time - autosensData.time < 0){
-                        // Autosens is newer than needed
-
-//                    }
+                    if(autosensData == null)
+                        return "I cannot live without autosens!";
                 }
 
                 if (autosensData != null) {
