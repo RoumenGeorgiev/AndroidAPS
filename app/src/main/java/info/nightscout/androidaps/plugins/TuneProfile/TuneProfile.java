@@ -973,6 +973,7 @@ public class TuneProfile implements PluginBase {
 
     public static String result(int daysBack){
         tunedISF = 0;
+        double isfResult = 0;
         basalsResultInit();
         long now = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
@@ -990,6 +991,7 @@ public class TuneProfile implements PluginBase {
             for (int i = daysBack; i > 0; i--) {
                 tunedBasalsInit();
                 getPlugin().basicResult(i);
+                isfResult += tunedISF;
                 for(int ii=0; ii<24; ii++){
 //                    log.debug(" basalsResult adding for "+ii+" value is "+basalsResult.get(ii)+" adding "+tunedBasals.get(ii));
                     basalsResult.set(ii, (basalsResult.get(ii) + tunedBasals.get(ii)));
@@ -1003,7 +1005,8 @@ public class TuneProfile implements PluginBase {
             int devisor = 1;
             if(profile.getUnits().equals("mmol"))
                 devisor = 18;
-            double isfResult = tunedISF / daysBack;
+//            isfResult = tunedISF;
+                isfResult = isfResult / daysBack;
             return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2);
     }
 
@@ -1026,9 +1029,11 @@ public class TuneProfile implements PluginBase {
         int averageBG = 0;
         double basalNeeded = 0d;
         double isf = getISF();
+        double daylyISF = isf;
         double deviation = 0d;
         double netDeviation = 0d;
-
+        double averageRatio = 0;
+        int counter = 0;
         tunedBasalsInit();
         log.debug("CheckPoint 12-8-0 creating bucketed_data for "+new Date(endTime).toLocaleString());
         createBucketedData(endTime);
@@ -1066,7 +1071,6 @@ public class TuneProfile implements PluginBase {
 
             // initialize
             deviation = 0;
-            int counter = 0;
 
             for (long time = starttime + (i * 60 * 60 * 1000l); time <= starttime + (i + 1) * 60 * 60 * 1000L; time += 5 * 60 * 1000L) {
                 //getPlugin().createBucketedData(time);
@@ -1082,14 +1086,16 @@ public class TuneProfile implements PluginBase {
                 if (autosensData != null) {
                     deviation += autosensData.deviation;
 //                    log.debug("Dev is:"+deviation+" at "+new Date(autosensData.time).toLocaleString());
-                    counter++;
+//                    counter++;
                 } //else
 //                    log.debug("CheckPoint 6-3 Cannot get autosens data for "+time);
 
             }
             // use net dev not average
             netDeviation = deviation;
-            log.debug("netDeviation at "+i+" "+netDeviation);
+            averageRatio += autosensData.autosensRatio;
+            counter++;
+            log.debug("netDeviation at "+i+" "+netDeviation+" ratio "+autosensData.autosensRatio);
             // calculate how much less or additional basal insulin would have been required to eliminate the deviations
             // only apply 20% of the needed adjustment to keep things relatively stable
             basalNeeded = 0.2 * netDeviation / isf;
@@ -1158,6 +1164,8 @@ public class TuneProfile implements PluginBase {
 
 
             }
+            // Needded for the ISF tuning
+            averageRatio = averageRatio / counter;
             for (int ii = 0; ii < 24; ii++) {
                 //console.error(newHourlyBasalProfile[hour],hourlyPumpProfile[hour].rate*1.2);
                 // cap adjustments at autosens_max and autosens_min
@@ -1175,10 +1183,13 @@ public class TuneProfile implements PluginBase {
                     tunedBasals.set(ii, minRate);
                 }
                 tunedBasals.set(ii, round(tunedBasals.get(ii),3));
-                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii)+" ratio is "+autosensData.autosensRatio);
+                daylyISF += isf / averageRatio;
+                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii)+" ratio is "+autosensData.autosensRatio +" average "+averageRatio);
+
             }
+            tunedISF = daylyISF / 24;
             if (averageBG > 0){
-                tunedISF += isf / autosensData.autosensRatio;
+//                tunedISF += isf / autosensData.autosensRatio;
                 log.debug("Tuned ISF is "+tunedISF);
                 log.debug("Tuning from "+new Date(starttime).toLocaleString()+" to "+new Date(endTime).toLocaleString()+" took "+((System.currentTimeMillis()-now)/1000L)+" s");
                 return averageBG + "\n" + displayBasalsResult();
