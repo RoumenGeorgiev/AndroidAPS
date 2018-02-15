@@ -161,7 +161,7 @@ public class TuneProfile implements PluginBase {
         profile = MainApp.getConfigBuilder().getProfile();
     }
 
-    public void getGlucoseData(long start, long end) {
+/*    public void getGlucoseData(long start, long end) {
         //get glucoseData for 1 day back
         long oneDayBack = end - 24 * 60 * 60 *1000L;
         glucose_data = MainApp.getDbHelper().getBgreadingsDataFromTime(oneDayBack, true);
@@ -180,7 +180,7 @@ public class TuneProfile implements PluginBase {
         }
 //        log.debug("CheckPoint 12-2 - glucose_data.size is "+glucose_data.size()+"("+initialSize+") from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
 
-    }
+    }*/
 
     public List<BgReading> getBGFromTo(long from, long to) {
         List<BgReading> bg_data_temp = MainApp.getDbHelper().getBgreadingsDataFromTime(from, true);
@@ -309,7 +309,7 @@ public class TuneProfile implements PluginBase {
         synchronized (dataLock) {
 //            log.debug("CheckPoint 10-1 - glucose_data "+glucose_data.size()+" records");
             glucose_data = getBGFromTo(endTime- 24*60*60*1000l, endTime);
-//            log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
+            log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
             if (glucose_data == null || glucose_data.size() < 3) {
 
                 bucketed_data = null;
@@ -530,7 +530,7 @@ public class TuneProfile implements PluginBase {
     public synchronized void trimGlucose(long start, long end){
         // initialize glucose_data
         if(glucose_data.size() == 0)
-            getGlucoseData(start, end);
+            glucose_data = getBGFromTo(start, end);
         if(glucose_data.size() < 1)
             // no BG data
             return ;
@@ -609,7 +609,7 @@ public class TuneProfile implements PluginBase {
                     return getLastAutosensData();
                 }
                 //log.debug(">>> getAutosensData Cache miss " + new Date(time).toLocaleString());
-                log.debug("CheckPoint 4-2 - autosensDataTable.get("+new Date(time).toString()+") is null");
+//                log.debug("CheckPoint 4-2 - autosensDataTable.get("+new Date(time).toString()+") is null");
                 return null;
             }
         }
@@ -1035,14 +1035,15 @@ public class TuneProfile implements PluginBase {
         if(bucketed_data != null) {
             // No data return same basals
             log.debug("CheckPoint 12-8-1 bucketed_data size " + bucketed_data.size() + " end is " + new Date(endTime).toLocaleString());
-            return "No BG data for this day";
+//            return "No BG data for this day";
         }
         calculateSensitivityData(starttime, endTime);
         if(autosensDataTable.size() >0 ) {
             log.debug("CheckPoint 12-8-2 calculated sensitivityDataTable size " + autosensDataTable.size() + " end is " + new Date(endTime));
             log.debug("CheckPoint 12-8-2 start:" + new Date(autosensDataTable.valueAt(0).time).toLocaleString());
             log.debug("CheckPoint 12-8-2 end  :" + new Date(autosensDataTable.valueAt(autosensDataTable.size()-1).time).toLocaleString());
-        }
+        } else
+            log.debug("CheckPoint 12-8-3 - autoSensDataTable is "+autosensDataTable.size());
         AutosensData autosensData = getAutosensData(endTime);
 
         // Detecting sensitivity for the whole day
@@ -1166,18 +1167,18 @@ public class TuneProfile implements PluginBase {
                 double minRate = tunedBasals.get(ii) * autotuneMin;
                 if (tunedBasals.get(ii) > maxRate ) {
 //                    console.error("Limiting hour",hour,"basal to",maxRate.toFixed(2),"(which is",autotuneMax,"* pump basal of",hourlyPumpProfile[hour].rate,")");
-                    //console.error("Limiting hour",hour,"basal to",maxRate.toFixed(2),"(which is 20% above pump basal of",hourlyPumpProfile[hour].rate,")");
+                    log.debug("Limiting hour"+tunedBasals.get(ii)+"basal to"+maxRate+"(which is 20% above pump basal of");
                     tunedBasals.set(ii, maxRate);
                 } else if (tunedBasals.get(ii) < minRate ) {
 //                    console.error("Limiting hour",hour,"basal to",minRate.toFixed(2),"(which is",autotuneMin,"* pump basal of",hourlyPumpProfile[hour].rate,")");
-                    //console.error("Limiting hour",hour,"basal to",minRate.toFixed(2),"(which is 20% below pump basal of",hourlyPumpProfile[hour].rate,")");
+                    log.debug("Limiting hour "+tunedBasals.get(ii)+"basal to "+minRate+"(which is 20% below pump basal of");
                     tunedBasals.set(ii, minRate);
                 }
                 tunedBasals.set(ii, round(tunedBasals.get(ii),3));
                 log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii)+" ratio is "+autosensData.autosensRatio);
             }
             if (averageBG > 0){
-                tunedISF += isf * autosensData.autosensRatio;
+                tunedISF += isf / autosensData.autosensRatio;
                 log.debug("Tuned ISF is "+tunedISF);
                 log.debug("Tuning from "+new Date(starttime).toLocaleString()+" to "+new Date(endTime).toLocaleString()+" took "+((System.currentTimeMillis()-now)/1000L)+" s");
                 return averageBG + "\n" + displayBasalsResult();

@@ -62,8 +62,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         Date lastRun = new Date();
         int daysBack =  Integer.parseInt(tune_days.getText().toString());
         if(daysBack > 0 )
-            resultView.setText(TuneProfile.bgReadings(daysBack));
-//            resultView.setText(TuneProfile.result(daysBack));
+//            resultView.setText(TuneProfile.bgReadings(daysBack));
+            resultView.setText(TuneProfile.result(daysBack));
         else
             resultView.setText("Set days between 1 and 10!!!");
         // lastrun in minutes ???
