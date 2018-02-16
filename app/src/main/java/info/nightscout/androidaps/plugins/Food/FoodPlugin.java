@@ -9,7 +9,7 @@ import info.nightscout.androidaps.interfaces.PluginBase;
  */
 public class FoodPlugin implements PluginBase {
     private boolean fragmentEnabled = true;
-    private boolean fragmentVisible = true;
+    private boolean fragmentVisible = false;
 
     private static FoodPlugin plugin = null;
 
