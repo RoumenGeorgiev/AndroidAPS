@@ -525,7 +525,6 @@ public class NSClientService extends Service {
                                     JSONObject jsonTreatment = treatments.getJSONObject(index);
                                     NSTreatment treatment = new NSTreatment(jsonTreatment);
 
-
                                     // remove from upload queue if Ack is failing
                                     UploadQueue.removeID(jsonTreatment);
                                     //Find latest date in treatment
