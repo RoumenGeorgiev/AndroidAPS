@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.Date;
 
 import info.nightscout.androidaps.MainApp;
@@ -67,6 +68,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
             try {
                 resultView.setText(TuneProfile.result(daysBack));
             } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ParseException e) {
                 e.printStackTrace();
             }
         else

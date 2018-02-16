@@ -12,7 +12,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -36,7 +40,7 @@ public class NSService {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
         String sgvValues = "api/v1/entries/sgv.json";
         URL url = new URL(nsURL+sgvValues);
-        log.debug("URL is:"+nsURL+sgvValues);
+//        log.debug("URL is:"+nsURL+sgvValues);
         List<BgReading> sgv = new ArrayList<BgReading>();
         HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
         try {
@@ -47,10 +51,10 @@ public class NSService {
             while ((line = r.readLine()) != null) {
                 total.append(line).append('\n');
             }
-            log.debug("NS-values:"+total);
+//            log.debug("NS-values:"+total);
             JSONArray values = new JSONArray(total.toString());
             for(int i = 0; i<values.length(); i++) {
-                log.debug("\n"+i+" -> " + values.get(i).toString());
+//                log.debug("\n"+i+" -> " + values.get(i).toString());
                 JSONObject sgvJson = new JSONObject(values.get(i).toString());
                 BgReading bgReading = new BgReading();
                 bgReading.date = sgvJson.getLong("date");
@@ -75,7 +79,7 @@ public class NSService {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
         String sgvValues = "api/v1/entries/sgv.json";
         URL url = new URL(nsURL+sgvValues);
-        log.debug("URL is:"+nsURL+sgvValues);
+//        log.debug("URL is:"+nsURL+sgvValues);
         List<BgReading> sgv = new ArrayList<BgReading>();
         HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
         try {
@@ -86,10 +90,54 @@ public class NSService {
             while ((line = r.readLine()) != null) {
                 total.append(line).append('\n');
             }
-            log.debug("NS-values:"+total);
+//            log.debug("NS-values:"+total);
             JSONArray values = new JSONArray(total.toString());
             for(int i = 0; i<values.length(); i++) {
-                log.debug("\n"+i+" -> " + values.get(i).toString());
+//                log.debug("\n"+i+" -> " + values.get(i).toString());
+                JSONObject sgvJson = new JSONObject(values.get(i).toString());
+                BgReading bgReading = new BgReading();
+                bgReading.date = sgvJson.getLong("date");
+                bgReading.value = sgvJson.getDouble("sgv");
+                bgReading.direction = sgvJson.getString("direction");
+                //bgReading.raw = sgvJson.getLong("raw");
+                bgReading._id = sgvJson.getString("_id");
+                sgv.add(bgReading);
+            }
+            log.debug("Size of SGV: "+sgv.size());
+
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } finally {
+            urlConnection.disconnect();
+        }
+        return sgv;
+    }
+
+    public List<BgReading> getSgvValues(long from, long to) throws IOException, ParseException {
+        String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+        // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
+        String sgvValues = "api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
+        URL url = new URL(nsURL+sgvValues+"&[count]=400");
+        log.debug("URL is:"+nsURL+sgvValues);
+        List<BgReading> sgv = new ArrayList<BgReading>();
+        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+        try {
+            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+            BufferedReader r = new BufferedReader(new InputStreamReader(in));
+            StringBuilder total = new StringBuilder();
+            String line;
+            int lineCounter=1;
+            while ((line = r.readLine()) != null) {
+//                total.append(line).append('\n');
+                log.debug(lineCounter + " - "+line);
+                total.append(line);
+                lineCounter++;
+            }
+//            log.debug("NS-values:"+total);
+            JSONArray values = new JSONArray(total.toString());
+            for(int i = 0; i<values.length(); i++) {
+//                log.debug("\n"+i+" -> " + values.get(i).toString());
                 JSONObject sgvJson = new JSONObject(values.get(i).toString());
                 BgReading bgReading = new BgReading();
                 bgReading.date = sgvJson.getLong("date");

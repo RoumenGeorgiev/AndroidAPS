@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -972,10 +973,8 @@ public class TuneProfile implements PluginBase {
 
     }
 
-    public static String result(int daysBack) throws IOException {
-        NSService nsService = new NSService();
-        List<BgReading> fromNS = nsService.getSgvValues();
-        log.debug("CheckPoint 15-0 NS SGV size is "+fromNS.size()+" or "+nsService.sgv.size());
+    public static String result(int daysBack) throws IOException, ParseException {
+
         tunedISF = 0;
         double isfResult = 0;
         basalsResultInit();
@@ -989,6 +988,10 @@ public class TuneProfile implements PluginBase {
         // midnight
         long endTime = c.getTimeInMillis();
         long starttime = endTime - (24 * 60 * 60 * 1000L);
+        NSService nsService = new NSService();
+        List<BgReading> fromNS = nsService.getSgvValues(starttime, endTime);
+        log.debug("CheckPoint 15-0 NS SGV size is "+fromNS.size());
+
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
         } else {
