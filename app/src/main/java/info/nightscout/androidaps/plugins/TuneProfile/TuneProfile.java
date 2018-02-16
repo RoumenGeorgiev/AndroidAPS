@@ -183,6 +183,13 @@ public class TuneProfile implements PluginBase {
 //        log.debug("CheckPoint 12-2 - glucose_data.size is "+glucose_data.size()+"("+initialSize+") from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
 
     }*/
+    public List<BgReading> getBGDataFromNS(long from, long to) throws IOException, ParseException {
+        NSService nsService = null;
+        nsService = new NSService();
+        List<BgReading> fromNS = nsService.getSgvValues(from, to);
+        log.debug("CheckPoint 15-0 NS SGV size is "+fromNS.size());
+        return fromNS;
+    }
 
     public List<BgReading> getBGFromTo(long from, long to) {
         List<BgReading> bg_data_temp = MainApp.getDbHelper().getBgreadingsDataFromTime(from, true);
@@ -270,7 +277,7 @@ public class TuneProfile implements PluginBase {
     }
 
 // Mass copy of IobCobCalculator functions
-    private void createBucketedData(long endTime) {
+    private void createBucketedData(long endTime) throws IOException, ParseException {
         log.debug("CheckPoint 6 - entered createBucketedData");
         if (isAbout5minData()) {
             log.debug("CheckPoint 7");
@@ -305,12 +312,13 @@ public class TuneProfile implements PluginBase {
         }
     }
 
-    private void createBucketedDataRecalculated(long endTime) {
+    private void createBucketedDataRecalculated(long endTime) throws IOException, ParseException {
         // Created by Rumen for timesensitive autosensCalc
 
         synchronized (dataLock) {
 //            log.debug("CheckPoint 10-1 - glucose_data "+glucose_data.size()+" records");
-            glucose_data = getBGFromTo(endTime- 24*60*60*1000l, endTime);
+//            glucose_data = getBGFromTo(endTime- 24*60*60*1000l, endTime);
+            glucose_data = getBGDataFromNS(endTime- 24*60*60*1000l, endTime);
             log.debug("CheckPoint 10-2 - glucose_data "+glucose_data.size()+" records");
             if (glucose_data == null || glucose_data.size() < 3) {
 
@@ -771,7 +779,7 @@ public class TuneProfile implements PluginBase {
         return output;
     }
 
-    private void calculateSensitivityData(long startTime, long endTime) {
+    private void calculateSensitivityData(long startTime, long endTime) throws IOException, ParseException {
         if (MainApp.getConfigBuilder() == null || bucketed_data == null)
             return; // app still initializing
         if (MainApp.getConfigBuilder().getProfile() == null)
@@ -988,9 +996,6 @@ public class TuneProfile implements PluginBase {
         // midnight
         long endTime = c.getTimeInMillis();
         long starttime = endTime - (24 * 60 * 60 * 1000L);
-        NSService nsService = new NSService();
-        List<BgReading> fromNS = nsService.getSgvValues(starttime, endTime);
-        log.debug("CheckPoint 15-0 NS SGV size is "+fromNS.size());
 
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
@@ -1017,7 +1022,7 @@ public class TuneProfile implements PluginBase {
             return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2);
     }
 
-    String basicResult(int daysBack) {
+    String basicResult(int daysBack) throws IOException, ParseException {
         // get some info and spit out a suggestion
         // TODO: Same function for ISF and CR
         // TODO: Find a way to ask NSClient to fetch SGV for that day

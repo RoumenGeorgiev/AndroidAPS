@@ -37,7 +37,7 @@ public class NSService {
     public List<BgReading> sgv = new ArrayList<BgReading>();
 
     public NSService() throws IOException {
-        String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+ /*       String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
         String sgvValues = "api/v1/entries/sgv.json";
         URL url = new URL(nsURL+sgvValues);
 //        log.debug("URL is:"+nsURL+sgvValues);
@@ -71,47 +71,7 @@ public class NSService {
             e.printStackTrace();
         } finally {
             urlConnection.disconnect();
-        }
-    }
-
-
-    public List<BgReading> getSgvValues() throws IOException {
-        String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
-        String sgvValues = "api/v1/entries/sgv.json";
-        URL url = new URL(nsURL+sgvValues);
-//        log.debug("URL is:"+nsURL+sgvValues);
-        List<BgReading> sgv = new ArrayList<BgReading>();
-        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
-        try {
-            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-            BufferedReader r = new BufferedReader(new InputStreamReader(in));
-            StringBuilder total = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) {
-                total.append(line).append('\n');
-            }
-//            log.debug("NS-values:"+total);
-            JSONArray values = new JSONArray(total.toString());
-            for(int i = 0; i<values.length(); i++) {
-//                log.debug("\n"+i+" -> " + values.get(i).toString());
-                JSONObject sgvJson = new JSONObject(values.get(i).toString());
-                BgReading bgReading = new BgReading();
-                bgReading.date = sgvJson.getLong("date");
-                bgReading.value = sgvJson.getDouble("sgv");
-                bgReading.direction = sgvJson.getString("direction");
-                //bgReading.raw = sgvJson.getLong("raw");
-                bgReading._id = sgvJson.getString("_id");
-                sgv.add(bgReading);
-            }
-            log.debug("Size of SGV: "+sgv.size());
-
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } finally {
-            urlConnection.disconnect();
-        }
-        return sgv;
+        }*/
     }
 
     public List<BgReading> getSgvValues(long from, long to) throws IOException, ParseException {
@@ -119,7 +79,7 @@ public class NSService {
         // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
         String sgvValues = "api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
         URL url = new URL(nsURL+sgvValues+"&[count]=400");
-        log.debug("URL is:"+nsURL+sgvValues);
+//        log.debug("URL is:"+nsURL+sgvValues);
         List<BgReading> sgv = new ArrayList<BgReading>();
         HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
         try {
@@ -127,12 +87,8 @@ public class NSService {
             BufferedReader r = new BufferedReader(new InputStreamReader(in));
             StringBuilder total = new StringBuilder();
             String line;
-            int lineCounter=1;
             while ((line = r.readLine()) != null) {
-//                total.append(line).append('\n');
-                log.debug(lineCounter + " - "+line);
                 total.append(line);
-                lineCounter++;
             }
 //            log.debug("NS-values:"+total);
             JSONArray values = new JSONArray(total.toString());
