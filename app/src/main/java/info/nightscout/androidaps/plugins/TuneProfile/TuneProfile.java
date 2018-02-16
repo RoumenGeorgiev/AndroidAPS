@@ -278,13 +278,13 @@ public class TuneProfile implements PluginBase {
 
 // Mass copy of IobCobCalculator functions
     private void createBucketedData(long endTime) throws IOException, ParseException {
-        log.debug("CheckPoint 6 - entered createBucketedData");
+        log.debug("CheckPoint 12-8-0-1 - entered createBucketedData");
         if (isAbout5minData()) {
-            log.debug("CheckPoint 7");
+            log.debug("CheckPoint 12-8-0-2");
             createBucketedDataRecalculated(endTime);
 //            createBucketedData5min(endTime);
         } else
-            log.debug("CheckPoint 8 - creating bucketedDataRecalculated("+new Date(endTime).toLocaleString()+")");
+            log.debug("CheckPoint 12-8-0-3 - creating bucketedDataRecalculated("+new Date(endTime).toLocaleString()+")");
             createBucketedDataRecalculated(endTime);
     }
 
@@ -329,7 +329,7 @@ public class TuneProfile implements PluginBase {
 //            log.debug("CheckPoint 11");
             bucketed_data = new ArrayList<>();
             long currentTime = glucose_data.get(0).date + 5 * 60 * 1000 - glucose_data.get(0).date % (5 * 60 * 1000) - 5 * 60 * 1000L;
-//            log.debug("CheckPoint 11-1 First reading: " + new Date(currentTime).toLocaleString());
+            log.debug("CheckPoint 11-1 First reading: " + new Date(currentTime).toLocaleString());
 
             while (true) {
                 // test if current value is older than current time
@@ -346,7 +346,7 @@ public class TuneProfile implements PluginBase {
                     }
 
                 }
-//                log.debug("CheckPoint 11-2-1  bucketed_data.size" + bucketed_data.size());
+                log.debug("CheckPoint 11-2-1  bucketed_data.size " + bucketed_data.size());
                 break;
             }
                /* BgReading newer = findNewer(glucose_data, currentTime);
