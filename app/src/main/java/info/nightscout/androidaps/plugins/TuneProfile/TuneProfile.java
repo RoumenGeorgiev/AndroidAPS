@@ -21,6 +21,7 @@ import info.nightscout.utils.SafeParse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -971,7 +972,10 @@ public class TuneProfile implements PluginBase {
 
     }
 
-    public static String result(int daysBack){
+    public static String result(int daysBack) throws IOException {
+        NSService nsService = new NSService();
+        List<BgReading> fromNS = nsService.getSgvValues();
+        log.debug("CheckPoint 15-0 NS SGV size is "+fromNS.size()+" or "+nsService.sgv.size());
         tunedISF = 0;
         double isfResult = 0;
         basalsResultInit();

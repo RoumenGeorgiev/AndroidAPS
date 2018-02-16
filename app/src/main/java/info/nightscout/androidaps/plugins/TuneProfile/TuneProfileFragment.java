@@ -17,6 +17,7 @@ import com.crashlytics.android.answers.CustomEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Date;
 
 import info.nightscout.androidaps.MainApp;
@@ -63,7 +64,11 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         int daysBack =  Integer.parseInt(tune_days.getText().toString());
         if(daysBack > 0 )
 //            resultView.setText(TuneProfile.bgReadings(daysBack));
-            resultView.setText(TuneProfile.result(daysBack));
+            try {
+                resultView.setText(TuneProfile.result(daysBack));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         else
             resultView.setText("Set days between 1 and 10!!!");
         // lastrun in minutes ???
