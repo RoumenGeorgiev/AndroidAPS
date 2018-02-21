@@ -283,9 +283,10 @@ public class TuneProfile implements PluginBase {
             log.debug("CheckPoint 12-8-0-2");
             createBucketedDataRecalculated(endTime);
 //            createBucketedData5min(endTime);
-        } else
-            log.debug("CheckPoint 12-8-0-3 - creating bucketedDataRecalculated("+new Date(endTime).toLocaleString()+")");
+        } else {
+            log.debug("CheckPoint 12-8-0-3 - creating bucketedDataRecalculated(" + new Date(endTime).toLocaleString() + ")");
             createBucketedDataRecalculated(endTime);
+        }
     }
 
     private boolean isAbout5minData() {
@@ -841,7 +842,7 @@ public class TuneProfile implements PluginBase {
                 double delta;
                 bg = bucketed_data.get(i).value;
                 if (bg < 39 || bucketed_data.get(i + 3).value < 39) {
-                    log.error("! value < 39");
+//                    log.error("! value < 39");
                     continue;
                 }
                 delta = (bg - bucketed_data.get(i + 1).value);
