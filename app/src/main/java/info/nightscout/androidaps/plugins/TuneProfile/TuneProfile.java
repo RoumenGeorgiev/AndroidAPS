@@ -1087,7 +1087,8 @@ public class TuneProfile implements PluginBase {
 
             for (long time = starttime + (i * 60 * 60 * 1000l); time <= starttime + (i + 1) * 60 * 60 * 1000L; time += 5 * 60 * 1000L) {
                 //getPlugin().createBucketedData(time);
-                getPlugin().calculateSensitivityData(starttime, time);
+                //Try to get autosens for the whole day not exact time like here
+                //getPlugin().calculateSensitivityData(starttime, time);
 //                log.debug("Getting autosens for "+new Date(time).toLocaleString());
                 autosensData = getAutosensData(time);
                 if(autosensData == null) {
@@ -1113,6 +1114,7 @@ public class TuneProfile implements PluginBase {
             // only apply 20% of the needed adjustment to keep things relatively stable
             basalNeeded = 0.2 * netDeviation / isf;
             basalNeeded = round(basalNeeded,2);
+            log.debug("insulin needed: "+basalNeeded);
                 // if basalNeeded is positive, adjust each of the 1-3 hour prior basals by 10% of the needed adjustment
                 if (basalNeeded > 0) {
                     for (int offset = -3; offset < 0; offset++) {
@@ -1194,10 +1196,11 @@ public class TuneProfile implements PluginBase {
 //                    console.error("Limiting hour",hour,"basal to",minRate.toFixed(2),"(which is",autotuneMin,"* pump basal of",hourlyPumpProfile[hour].rate,")");
                     log.debug("Limiting hour "+tunedBasals.get(ii)+"basal to "+minRate+"(which is 20% below pump basal of");
                     tunedBasals.set(ii, minRate);
+                } else {
+                    tunedBasals.set(ii, round(tunedBasals.get(ii), 3));
+                    daylyISF += isf / averageRatio;
+                    log.debug("Tuned at " + ii + " is " + tunedBasals.get(ii) + " ratio is " + autosensData.autosensRatio + " average " + averageRatio);
                 }
-                tunedBasals.set(ii, round(tunedBasals.get(ii),3));
-                daylyISF += isf / averageRatio;
-                log.debug("Tuned is " + ii + " is " + tunedBasals.get(ii)+" ratio is "+autosensData.autosensRatio +" average "+averageRatio);
 
             }
             tunedISF = daylyISF / 24;
