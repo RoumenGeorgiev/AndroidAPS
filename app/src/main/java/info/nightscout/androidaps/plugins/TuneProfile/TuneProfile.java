@@ -982,7 +982,7 @@ public class TuneProfile implements PluginBase {
 
     }
 
-    public static String result(int daysBack) throws IOException, ParseException {
+    public  String result(int daysBack) throws IOException, ParseException {
 
         tunedISF = 0;
         double isfResult = 0;
@@ -998,6 +998,12 @@ public class TuneProfile implements PluginBase {
         long endTime = c.getTimeInMillis();
         long starttime = endTime - (24 * 60 * 60 * 1000L);
         Date lastProfileChange = NSService.lastProfileChange();
+        NSService nsService = new NSService();
+        //Check if Wifi is Connected
+        if(!nsService.isWifiConnected()){
+            return "READ THE WARNING!";
+        }
+
         // check if daysBack goes before the last profile switch
         if((System.currentTimeMillis() - (daysBack * 24 * 60 * 60 * 1000L)) < lastProfileChange.getTime()){
             return "ERROR -> I cannot tune before the last profile switch!("+(System.currentTimeMillis() - lastProfileChange.getTime()) / (24 * 60 * 60 * 1000L)+" days ago)";

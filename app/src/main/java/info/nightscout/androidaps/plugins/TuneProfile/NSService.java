@@ -1,4 +1,8 @@
 package info.nightscout.androidaps.plugins.TuneProfile;
+// These two are needed for wifi check
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -22,6 +26,7 @@ import java.util.List;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.db.BgReading;
 import info.nightscout.utils.SP;
@@ -36,9 +41,18 @@ import info.nightscout.utils.SP;
 public class NSService {
     private static Logger log = LoggerFactory.getLogger(NSService.class);
     public List<BgReading> sgv = new ArrayList<BgReading>();
+    Context mContext = MainApp.instance().getApplicationContext();
+
 
     public NSService() throws IOException {
 
+    }
+
+    public boolean isWifiConnected(){
+        ConnectivityManager connManager = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+        return mWifi.isConnected();
     }
 
     public List<BgReading> getSgvValues(long from, long to) throws IOException, ParseException {

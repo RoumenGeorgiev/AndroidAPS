@@ -66,7 +66,8 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
         if(daysBack > 0 )
 //            resultView.setText(TuneProfile.bgReadings(daysBack));
             try {
-                resultView.setText(TuneProfile.result(daysBack));
+                TuneProfile tuneProfile = new TuneProfile();
+                resultView.setText(tuneProfile.result(daysBack));
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (ParseException e) {
@@ -88,7 +89,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
                 @Override
                 public void run() {
 //                    TuneProfile tuneProfile = new TuneProfile();
-                    warningView.setText("Don't run tune for more than 5 days back! It will cause app crashesh and too much data usage");
+                    warningView.setText("Don't run tune for more than 5 days back! It will cause app crashesh and too much data usage! Don't even try to run whithout WiFi connectivity!");
                     resultView.setText("Press run");
                 }
             });
