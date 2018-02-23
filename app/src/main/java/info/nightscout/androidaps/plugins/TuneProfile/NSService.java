@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -84,5 +85,46 @@ public class NSService {
             reversedSGV.add(sgv.get(i));
         }
         return reversedSGV;
+    }
+
+    static Date lastProfileChange() throws IOException {
+        // Find a way to get the time of last profile change from ns so we should run the tune not before it
+        String profileDateSting = "";
+        long profileDate;
+        Date lastChange = new Date(0);
+        String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+        // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
+        String profileQuery = "api/v1/treatments.json?find[eventType]=Profile%20Switch&[count]=1";
+        URL url = new URL(nsURL+profileQuery);
+        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+        try {
+            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+            BufferedReader r = new BufferedReader(new InputStreamReader(in));
+            StringBuilder total = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) {
+                total.append(line);
+            }
+            JSONArray values = new JSONArray(total.toString());
+            for(int i = 0; i<values.length(); i++) {
+                JSONObject profileJson = new JSONObject(values.get(i).toString());
+                profileDateSting = profileJson.getString("created_at");
+                if(profileDateSting == null)
+                    return new Date(0);
+                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+                try {
+                    lastChange = format.parse(profileDateSting);
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } finally {
+            urlConnection.disconnect();
+        }
+        return lastChange;
     }
 }

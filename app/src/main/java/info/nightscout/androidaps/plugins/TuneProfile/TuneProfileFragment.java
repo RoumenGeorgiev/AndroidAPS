@@ -87,7 +87,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
             activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    TuneProfile tuneProfile = new TuneProfile();
+//                    TuneProfile tuneProfile = new TuneProfile();
                     warningView.setText("Don't run tune for more than 5 days back! It will cause app crashesh and too much data usage");
                     resultView.setText("Press run");
                 }

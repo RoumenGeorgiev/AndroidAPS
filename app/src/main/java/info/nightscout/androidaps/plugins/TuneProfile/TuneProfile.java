@@ -997,7 +997,11 @@ public class TuneProfile implements PluginBase {
         // midnight
         long endTime = c.getTimeInMillis();
         long starttime = endTime - (24 * 60 * 60 * 1000L);
-
+        Date lastProfileChange = NSService.lastProfileChange();
+        // check if daysBack goes before the last profile switch
+        if((System.currentTimeMillis() - (daysBack * 24 * 60 * 60 * 1000L)) < lastProfileChange.getTime()){
+            return "ERROR -> I cannot tune before the last profile switch!("+(System.currentTimeMillis() - lastProfileChange.getTime()) / (24 * 60 * 60 * 1000L)+" days ago)";
+        }
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
         } else {
@@ -1020,7 +1024,7 @@ public class TuneProfile implements PluginBase {
                 devisor = 18;
 //            isfResult = tunedISF;
                 isfResult = isfResult / daysBack;
-            return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2);
+            return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2)+"\nLast profile change was: "+lastProfileChange.toLocaleString();
     }
 
     String basicResult(int daysBack) throws IOException, ParseException {
@@ -1215,7 +1219,6 @@ public class TuneProfile implements PluginBase {
     }
 
 
-
     public static String displayBasalsResult(){
         String result = "";
         for(int i=0;i<24; i++){
@@ -1228,7 +1231,7 @@ public class TuneProfile implements PluginBase {
     }
 
     public static void tunedBasalsInit(){
-        // initialize tunedBasals if
+        // initialize tunedBasals
         if(tunedBasals.isEmpty()) {
             //log.debug("TunedBasals is called!!!");
             for (int i = 0; i < 24; i++) {
