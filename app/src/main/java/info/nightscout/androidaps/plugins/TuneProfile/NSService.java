@@ -68,7 +68,7 @@ public class NSService {
     public List<BgReading> getSgvValues(long from, long to) throws IOException, ParseException {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
         // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
-        String sgvValues = "api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
+        String sgvValues = "/api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
         URL url = new URL(nsURL+sgvValues+"&[count]=400");
 //        log.debug("URL is:"+nsURL+sgvValues);
         List<BgReading> sgv = new ArrayList<BgReading>();
@@ -113,10 +113,14 @@ public class NSService {
 
     public List<Treatment> getTreatments(long from, long to) throws IOException, ParseException {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
-        // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
-        String sgvValues = "api/v1/entries/treatments.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
+        Date fromDate = new Date(from);
+        Date toDate = new Date(to);
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        String fromDateString = fromDate.toString();
+        String toDateString = toDate.toString();
+        String sgvValues = "/api/v1/treatments.json?find[created_at][$gte]="+dateFormat.format(fromDate)+"&find[created_at][$lte]="+dateFormat.format(toDate);
         URL url = new URL(nsURL+sgvValues+"&[count]=400");
-//        log.debug("URL is:"+nsURL+sgvValues);
+        log.debug("URL is:"+nsURL+sgvValues);
         List<Treatment> treatments = new ArrayList<Treatment>();
         HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
         try {
@@ -133,9 +137,10 @@ public class NSService {
 //                log.debug("\n"+i+" -> " + values.get(i).toString());
                 JSONObject treatmentJson = new JSONObject(values.get(i).toString());
                 Treatment treatment = new Treatment();
-                treatment.date = treatmentJson.getLong("date");
-                treatment.insulin = treatmentJson.getDouble("insulin");
-                treatment.carbs = treatmentJson.getDouble("carbs");
+                String date = treatmentJson.optString("created_at");
+                treatment.date = dateFormat.parse(date).getTime();
+                treatment.insulin = treatmentJson.optDouble("insulin", 0d);
+                treatment.carbs = treatmentJson.optDouble("carbs", 0d);
                 treatment._id = treatmentJson.getString("_id");
                 treatments.add(treatment);
             }
@@ -167,6 +172,11 @@ public class NSService {
         int boluses = 0;
         int maxCarbs = 0;
         //console.error(treatments);
+        try {
+            treatments = getTreatments(from,to);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         if (treatments.size() < 1) {
             log.debug("No treatments");
             return null;
@@ -177,7 +187,7 @@ public class NSService {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        JSONObject IOBInputs = null;
+        JSONObject IOBInputs = new JSONObject();
         IOBInputs.put("profile", profile);
         IOBInputs.put("history", "pumpHistory");
         List<BGDatum> CSFGlucoseData = new ArrayList<BGDatum>();
@@ -186,9 +196,9 @@ public class NSService {
         List<BGDatum> UAMGlucoseData = new ArrayList<BGDatum>();
         List<JSONObject> CRData = new ArrayList<JSONObject>();
 
-        List<BGDatum> bucketedData = null;
+        List<BGDatum> bucketedData = new ArrayList<BGDatum>();;
 
-        bucketedData.set(0, basalGlucoseData.get(0));
+        bucketedData.add(basalGlucoseData.get(0));
         int j = 0;
         //for loop to validate and bucket the data
         for (int i=1; i < sgv.size(); ++i) {
@@ -598,7 +608,7 @@ public class NSService {
         Date lastChange = new Date(0);
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
         // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
-        String profileQuery = "api/v1/treatments.json?find[eventType]=Profile%20Switch&[count]=1";
+        String profileQuery = "/api/v1/treatments.json?find[eventType]=Profile%20Switch&[count]=1";
         URL url = new URL(nsURL+profileQuery);
         HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
         try {
