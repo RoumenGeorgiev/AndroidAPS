@@ -33,12 +33,10 @@ import java.util.List;
  * Created by Rumen Georgiev on 1/29/2018.
  ideia is to port Autotune from OpenAPS to java
  let's start by taking 1 day of data from NS, and comparing it to ideal BG
- # defaults
- CURL_FLAGS="--compressed"
- DIR=""
- NIGHTSCOUT_HOST=""
- START_DATE=""
- END_DATE=""
+ TODO: Sort glucoseData like autotune-prep does categorize.js
+ TODO:
+ TODO: Get treatments
+ TODO: Add class BGDatum for compatibility with Categorize
  START_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  END_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  EXPORT_EXCEL="" # Default is to not export to Microsoft Excel
@@ -52,7 +50,7 @@ import java.util.List;
  -- correction insulin, or basal insulin, and adds in avgDelta and deviations,
  -- for use in oref0 autotuning algorithm
  -- get glucoseData and sort it
- -- get profile
+ -- get profile - done
  -- get treatments
 
  */
@@ -1036,7 +1034,6 @@ public class TuneProfile implements PluginBase {
     String basicResult(int daysBack) throws IOException, ParseException {
         // get some info and spit out a suggestion
         // TODO: Same function for ISF and CR
-        // TODO: Find a way to ask NSClient to fetch SGV for that day
         // time now
         long now = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
