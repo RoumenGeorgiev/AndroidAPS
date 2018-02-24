@@ -156,7 +156,7 @@ public class NSService {
         return reversedTreatments;
     }
 
-    public JSONObject categorizeBGDatums(long from, long to) throws JSONException {
+    public JSONObject categorizeBGDatums(long from, long to) throws JSONException, ParseException {
         // TODO: Although the data from NS should be sorted maybe we need to sort it
         // sortBGdata
         // sort treatments
@@ -172,6 +172,11 @@ public class NSService {
             return null;
         }
         //glucosedata is sgv
+        try {
+            sgv = getSgvValues(from, to);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         JSONObject IOBInputs = null;
         IOBInputs.put("profile", profile);
         IOBInputs.put("history", "pumpHistory");
@@ -282,8 +287,8 @@ public class NSService {
                 }
             }
 
-            double BG;
-            double avgDelta;
+            double BG=0;
+            double avgDelta = 0;
             double delta;
             // TODO: re-implement interpolation to avoid issues here with gaps
             // calculate avgDelta as last 4 datapoints to better catch more rises after COB hits zero
@@ -299,7 +304,7 @@ public class NSService {
             } else { log.error("Could not find glucose data"); }
 
             avgDelta = avgDelta*100 / 100;
-            glucoseDatumAvgDelta = avgDelta;
+            glucoseDatum.AvgDelta = avgDelta;
 
             //sens = ISF
 //            int sens = ISF.isfLookup(IOBInputs.profile.isfProfile,BGDate);
@@ -520,7 +525,11 @@ public class NSService {
             log.debug(absorbing+" mealCOB: "+round(mealCOB, 1)+"mealCarbs:"+mealCarbs+"basalBGI:"+round(basalBGI,1)+"BGI:"+BGI+"IOB:"+iob.iob+" at "+BGTime+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
         }
 
-        List<Treatment> treatments = TuneProfile.calculateFromTreatmentsAndTemps();
+        try {
+            List<Treatment> treatments = getTreatments(from, to);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         BgReading CRDatum;
         /*CRData.forEach(function(CRDatum) {
             JSONObject dosedOpts = {

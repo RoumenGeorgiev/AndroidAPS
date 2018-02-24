@@ -14,6 +14,7 @@ public class BGDatum extends BgReading {
     public long CRInitialCarbTime;
     public long CREndTime;
     public double CRInsulin;
+    public double AvgDelta;
 
     public BGDatum() {
     }
