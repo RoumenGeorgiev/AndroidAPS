@@ -111,7 +111,52 @@ public class NSService {
         return reversedSGV;
     }
 
-    public JSONObject categorizeBGDatums(List<BgReading> opts) throws JSONException {
+    public List<Treatment> getTreatments(long from, long to) throws IOException, ParseException {
+        String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+        // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
+        String sgvValues = "api/v1/entries/treatments.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
+        URL url = new URL(nsURL+sgvValues+"&[count]=400");
+//        log.debug("URL is:"+nsURL+sgvValues);
+        List<Treatment> treatments = new ArrayList<Treatment>();
+        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+        try {
+            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+            BufferedReader r = new BufferedReader(new InputStreamReader(in));
+            StringBuilder total = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) {
+                total.append(line);
+            }
+//            log.debug("NS-values:"+total);
+            JSONArray values = new JSONArray(total.toString());
+            for(int i = 0; i<values.length(); i++) {
+//                log.debug("\n"+i+" -> " + values.get(i).toString());
+                JSONObject treatmentJson = new JSONObject(values.get(i).toString());
+                Treatment treatment = new Treatment();
+                treatment.date = treatmentJson.getLong("date");
+                treatment.insulin = treatmentJson.getDouble("insulin");
+                treatment.carbs = treatmentJson.getDouble("carbs");
+                treatment._id = treatmentJson.getString("_id");
+                treatments.add(treatment);
+            }
+            log.debug("Size of treatments: "+treatments.size());
+
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } finally {
+            urlConnection.disconnect();
+        }
+        // SGV values returned by NS are in descending order we need to put them in ascending
+        // reverse the list
+        List<Treatment> reversedTreatments = new ArrayList<Treatment>();
+        for(int i=treatments.size()-1; i>-1; i--){
+            reversedTreatments.add(treatments.get(i));
+        }
+        return reversedTreatments;
+    }
+
+    public JSONObject categorizeBGDatums(long from, long to) throws JSONException {
         // TODO: Although the data from NS should be sorted maybe we need to sort it
         // sortBGdata
         // sort treatments
@@ -507,7 +552,7 @@ public class NSService {
             /*basalGlucoseData.sort(function (a, b) {
                 return a.deviation - b.deviation;
             });*/
-            List<BgReading> newBasalGlucose = new ArrayList<BgReading>();;
+            List<BGDatum> newBasalGlucose = new ArrayList<BGDatum>();;
             for(int i=0;i < basalGlucoseData.size()/2;i++){
                 newBasalGlucose.add(basalGlucoseData.get(i));
             }
