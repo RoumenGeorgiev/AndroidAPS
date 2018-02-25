@@ -208,7 +208,12 @@ public class NSService {
         List<BGDatum> UAMGlucoseData = new ArrayList<BGDatum>();
         List<JSONObject> CRData = new ArrayList<JSONObject>();
 
-        List<BGDatum> bucketedData = new ArrayList<BGDatum>();;
+        List<BGDatum> bucketedData = new ArrayList<BGDatum>();
+
+        double CRInitialIOB = 0d;
+        double CRInitialBG = 0d;
+        Date CRInitialCarbTime = null;
+
         // BasalGlucosedata is null
 //        bucketedData.add(basalGlucoseData.get(0));
         int j = 0;
@@ -457,13 +462,10 @@ public class NSService {
             // For now, if another meal IOB/COB stacks on top of it, consider them together
             // Compare beginning and ending BGs, and calculate how much more/less insulin is needed to neutralize
             // Use entered carbs vs. starting IOB + delivered insulin + needed-at-end insulin to directly calculate CR.
-            double CRInitialIOB = 0d;
-            double CRInitialBG = 0d;
-            Date CRInitialCarbTime = new Date();
             if (mealCOB > 0 || calculatingCR ) {
                 // set initial values when we first see COB
                 CRCarbs += myCarbs;
-                if (!calculatingCR) {
+                if (calculatingCR == false) {
                     CRInitialIOB = iob.iob;
                     CRInitialBG = glucoseDatum.value;
                     CRInitialCarbTime = new Date(glucoseDatum.date);
@@ -487,7 +489,7 @@ public class NSService {
                     JSONObject CRDatum = new JSONObject(crDataString);
                     //console.error(CRDatum);
 
-                    int CRElapsedMinutes = Math.round((CREndTime.getTime() - CRInitialCarbTime.getTime()) / 1000 / 60);
+                    int CRElapsedMinutes = Math.round((CREndTime.getTime() - CRInitialCarbTime.getTime()) / (1000 * 60));
                     //console.error(CREndTime - CRInitialCarbTime, CRElapsedMinutes);
                     if ( CRElapsedMinutes < 60 || ( i==1 && mealCOB > 0 ) ) {
                         log.debug("Ignoring "+CRElapsedMinutes+" m CR period.");
