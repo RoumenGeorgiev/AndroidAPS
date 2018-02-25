@@ -67,8 +67,10 @@ public class NSService {
 
     public List<BgReading> getSgvValues(long from, long to) throws IOException, ParseException {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+        if((nsURL.charAt(nsURL.length() - 1)) != '/')
+            nsURL = nsURL + '/';
         // URL should look like http://localhost:1337/api/v1/entries/sgv.json?find[dateString][$gte]=2015-08-28&find[dateString][$lte]=2015-08-30
-        String sgvValues = "/api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
+        String sgvValues = "api/v1/entries/sgv.json?find[date][$gte]="+from+"&find[date][$lte]="+to;
         URL url = new URL(nsURL+sgvValues+"&[count]=400");
 //        log.debug("URL is:"+nsURL+sgvValues);
         List<BgReading> sgv = new ArrayList<BgReading>();
@@ -104,21 +106,25 @@ public class NSService {
         }
         // SGV values returned by NS are in descending order we need to put them in ascending
         // reverse the list
-        List<BgReading> reversedSGV = new ArrayList<BgReading>();
+        /*List<BgReading> reversedSGV = new ArrayList<BgReading>();
         for(int i=sgv.size()-1; i>-1; i--){
             reversedSGV.add(sgv.get(i));
-        }
-        return reversedSGV;
+        }*/
+        return sgv;
     }
 
     public List<Treatment> getTreatments(long from, long to) throws IOException, ParseException {
         String nsURL = SP.getString(R.string.key_nsclientinternal_url, "");
+        if((nsURL.charAt(nsURL.length() - 1)) != '/')
+            nsURL = nsURL + '/';
+
         Date fromDate = new Date(from);
         Date toDate = new Date(to);
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat NSdateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
         String fromDateString = fromDate.toString();
         String toDateString = toDate.toString();
-        String sgvValues = "/api/v1/treatments.json?find[created_at][$gte]="+dateFormat.format(fromDate)+"&find[created_at][$lte]="+dateFormat.format(toDate);
+        String sgvValues = "api/v1/treatments.json?find[created_at][$gte]="+dateFormat.format(fromDate)+"&find[created_at][$lte]="+dateFormat.format(toDate);
         URL url = new URL(nsURL+sgvValues+"&[count]=400");
         log.debug("URL is:"+nsURL+sgvValues);
         List<Treatment> treatments = new ArrayList<Treatment>();
@@ -138,13 +144,15 @@ public class NSService {
                 JSONObject treatmentJson = new JSONObject(values.get(i).toString());
                 Treatment treatment = new Treatment();
                 String date = treatmentJson.optString("created_at");
-                treatment.date = dateFormat.parse(date).getTime();
+                treatment.date = NSdateFormat.parse(date).getTime();
+//                log.debug("Treatment date is "+date+" but formated is "+new Date(treatment.date).toString());
                 treatment.insulin = treatmentJson.optDouble("insulin", 0d);
                 treatment.carbs = treatmentJson.optDouble("carbs", 0d);
                 treatment._id = treatmentJson.getString("_id");
                 treatments.add(treatment);
+//                log.debug("Treatment got has date "+new Date(treatment.date).toGMTString());
             }
-            log.debug("Size of treatments: "+treatments.size());
+//            log.debug("Treatment Size of treatments: "+treatments.size());
 
 
         } catch (JSONException e) {
@@ -154,11 +162,11 @@ public class NSService {
         }
         // SGV values returned by NS are in descending order we need to put them in ascending
         // reverse the list
-        List<Treatment> reversedTreatments = new ArrayList<Treatment>();
+/*        List<Treatment> reversedTreatments = new ArrayList<Treatment>();
         for(int i=treatments.size()-1; i>-1; i--){
             reversedTreatments.add(treatments.get(i));
-        }
-        return reversedTreatments;
+        }*/
+        return treatments;
     }
 
     public JSONObject categorizeBGDatums(long from, long to) throws JSONException, ParseException {
@@ -187,6 +195,10 @@ public class NSService {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        if (sgv.size() < 1) {
+            log.debug("No SGV data");
+            return null;
+        }
         JSONObject IOBInputs = new JSONObject();
         IOBInputs.put("profile", profile);
         IOBInputs.put("history", "pumpHistory");
@@ -197,8 +209,8 @@ public class NSService {
         List<JSONObject> CRData = new ArrayList<JSONObject>();
 
         List<BGDatum> bucketedData = new ArrayList<BGDatum>();;
-
-        bucketedData.add(basalGlucoseData.get(0));
+        // BasalGlucosedata is null
+//        bucketedData.add(basalGlucoseData.get(0));
         int j = 0;
         //for loop to validate and bucket the data
         for (int i=1; i < sgv.size(); ++i) {
@@ -220,13 +232,20 @@ public class NSService {
             } else if (glucoseData[i-1].dateString) {
                 lastBGTime = new Date(glucoseData[i-1].dateString);*/
             else { log.error("Could not determine last BG time"); }
-            if (sgv.get(i).value < 39 || sgv.get(i-1).value < 39) {
+            if(i>1) {
+                if (sgv.get(i).value < 39 || sgv.get(i - 1).value < 39) {
+                    continue;
+                }
+            } else if (sgv.get(i).value < 39) {
                 continue;
             }
             long elapsedMinutes = (BGTime - lastBGTime)/(60*1000);
             if(Math.abs(elapsedMinutes) > 2) {
                 j++;
-                bucketedData.set(j,new BGDatum(sgv.get(i)));
+                if(bucketedData.size()<j)
+                    bucketedData.add(new BGDatum(sgv.get(i)));
+                else
+                    bucketedData.set(j,new BGDatum(sgv.get(i)));
 //                bucketedData<j>.date = BGTime;
                 /*if (! bucketedData[j].dateString) {
                     bucketedData[j].dateString = BGTime.toISOString();
@@ -241,6 +260,9 @@ public class NSService {
         }
         // go through the treatments and remove any that are older than the oldest glucose value
         //console.error(treatments);
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss''");
+        log.debug("Treatments size before clear: "+treatments.size());
+        log.debug("Treatment(0) "+new Date(treatments.get(0).date).toString()+" last "+new Date(treatments.get(treatments.size()-1).date).toString());
         for (int i=treatments.size()-1; i>0; --i) {
             Treatment treatment = treatments.get(i);
             //console.error(treatment);
@@ -251,10 +273,13 @@ public class NSService {
                 //console.error(glucoseDatum);
                 Date BGDate = new Date(glucoseDatum.date);
                 long BGTime = BGDate.getTime();
+
+//                log.debug("Oldest BG data is: "+format.format(BGDate)+" oldest treatment is: "+format.format(new Date(treatments.get(treatments.size()-1).date).toGMTString()));
                 if ( treatmentTime < BGTime ) {
                     //treatments.splice(i,1);
                     treatments.remove(i);
                 }
+//                log.debug("Treatment size after removing of older: "+treatments.size());
             }
         }
         //console.error(treatments);
@@ -270,7 +295,7 @@ public class NSService {
         List<Treatment> fullHistory = new ArrayList<Treatment>();//IOBInputs.history; TODO: get treatments with IOB
         double glucoseDatumAvgDelta = 0d;
         double glucoseDatumDelta = 0d;
-
+        log.debug("Categorize 1 - bucketedData.size() "+bucketedData.size());
         for (int i=bucketedData.size()-5; i > 0; --i) {
             BGDatum glucoseDatum = bucketedData.get(i);
             glucoseDatumAvgDelta = 0d;
@@ -278,30 +303,38 @@ public class NSService {
             //console.error(glucoseDatum);
             Date BGDate = new Date(glucoseDatum.date);
             long BGTime = BGDate.getTime();
+            int myCarbs = 0;
             // As we're processing each data point, go through the treatment.carbs and see if any of them are older than
             // the current BG data point.  If so, add those carbs to COB.
-            Treatment treatment = treatments.get(treatments.size()-1);
-            int myCarbs = 0;
-            if (treatment != null) {
-                Date treatmentDate = new Date(treatment.date);
-                long treatmentTime = treatmentDate.getTime();
-                //console.error(treatmentDate);
-                if ( treatmentTime < BGTime ) {
-                    if (treatment.carbs >= 1) {
-//                        Here I parse Integers not float like the original sorce categorize.js#136
-                        mealCOB += (int) (treatment.carbs);
-                        mealCarbs += (int) (treatment.carbs);
-                        myCarbs = (int) treatment.carbs;
+//            log.debug("Categorize 1-1 - Doing it for "+BGDate.toString()+" trSize is "+treatments.size());
+            for (int jj=0; jj < treatments.size()-1; jj++) {
+                Treatment treatment = treatments.get(jj);
+                if (treatment != null) {
+                    Date treatmentDate = new Date(treatment.date);
+                    long treatmentTime = treatmentDate.getTime();
+                    //console.error(treatmentDate);
+//                    log.debug("Categorize 1-2 Treatment at position(" + (treatments.size() - 1) + ") diff is " + new Date(BGTime).toGMTString() + " trDate " + new Date(treatmentTime).toGMTString());
+                    if (treatmentTime < BGTime) {
+                        if (treatment.carbs >= 1) {
+    //                        Here I parse Integers not float like the original source categorize.js#136
+                            log.debug("Categorize 1-3 Adding carbs: " + treatment.carbs + " for date " + new Date(treatment.date).toLocaleString());
+                            mealCOB += (int) (treatment.carbs);
+                            mealCarbs += (int) (treatment.carbs);
+                            myCarbs = (int) treatment.carbs;
+
+                        } //else
+    //                            log.debug("Treatment date: "+new Date(treatmentTime).toString()+" but BGTime: "+new Date(BGTime).toString());
+//                        treatments.remove(treatments.size() - 1);
+                        treatments.remove(jj);
                     }
-                    treatments.remove(treatments.size()-1);
                 }
             }
-
             double BG=0;
             double avgDelta = 0;
             double delta;
             // TODO: re-implement interpolation to avoid issues here with gaps
             // calculate avgDelta as last 4 datapoints to better catch more rises after COB hits zero
+//            log.debug("Categorize 2");
             if (bucketedData.get(i).value != 0 && bucketedData.get(i+4).value != 0) {
                 //console.error(bucketedData[i]);
                 BG = bucketedData.get(i).value;
@@ -336,7 +369,10 @@ public class NSService {
                     newHistory.add(fullHistory.get(h));
                 }
             }
-            IOBInputs = new JSONObject(newHistory.toString());
+            if(newHistory != null)
+                IOBInputs = new JSONObject(newHistory.toString());
+            else
+                IOBInputs = new JSONObject();
             // process.stderr.write("" + newHistory.length + " ");
             //console.error(newHistory[0].created_at,newHistory[newHistory.length-1].created_at,newHistory.length);
 
@@ -421,16 +457,18 @@ public class NSService {
             // For now, if another meal IOB/COB stacks on top of it, consider them together
             // Compare beginning and ending BGs, and calculate how much more/less insulin is needed to neutralize
             // Use entered carbs vs. starting IOB + delivered insulin + needed-at-end insulin to directly calculate CR.
-
+            double CRInitialIOB = 0d;
+            double CRInitialBG = 0d;
+            Date CRInitialCarbTime = new Date();
             if (mealCOB > 0 || calculatingCR ) {
                 // set initial values when we first see COB
                 CRCarbs += myCarbs;
-                //if (!calculatingCR) {
-                    double CRInitialIOB = iob.iob;
-                    double CRInitialBG = glucoseDatum.value;
-                    Date CRInitialCarbTime = new Date(glucoseDatum.date);
-                    log.debug("CRInitialIOB:"+CRInitialIOB+"CRInitialBG:"+CRInitialBG+"CRInitialCarbTime:"+CRInitialCarbTime);
-                //}
+                if (!calculatingCR) {
+                    CRInitialIOB = iob.iob;
+                    CRInitialBG = glucoseDatum.value;
+                    CRInitialCarbTime = new Date(glucoseDatum.date);
+                    log.debug("CRInitialIOB: "+CRInitialIOB+" CRInitialBG: "+CRInitialBG+" CRInitialCarbTime: "+CRInitialCarbTime.toString());
+                }
                 // keep calculatingCR as long as we have COB or enough IOB
                 if ( mealCOB > 0 && i>1 ) {
                     calculatingCR = true;
@@ -441,14 +479,18 @@ public class NSService {
                     double CREndIOB = iob.iob;
                     double CREndBG = glucoseDatum.value;
                     Date CREndTime = new Date(glucoseDatum.date);
-                    log.debug("CREndIOB:"+CREndIOB+"CREndBG:"+CREndBG+"CREndTime:"+CREndTime);
-                    JSONObject CRDatum = new JSONObject("{\"CRInitialIOB\": "+CRInitialIOB+",   \"CRInitialBG\": "+CRInitialBG+",   \"CRInitialCarbTime\": "+CRInitialCarbTime+",   \"CREndIOB\": " +CREndIOB+                            ",   \"CREndBG\": "+CREndBG+                            ",   \"CREndTime\": "+CREndTime+                            ",   \"CRCarbs\": "+CRCarbs+"}");
+                    log.debug("CREndIOB: "+CREndIOB+" CREndBG: "+CREndBG+" CREndTime: "+CREndTime);
+                    //TODO:Fix this one as it produces error
+//                    JSONObject CRDatum = new JSONObject("{\"CRInitialIOB\": "+CRInitialIOB+",   \"CRInitialBG\": "+CRInitialBG+",   \"CRInitialCarbTime\": "+CRInitialCarbTime+",   \"CREndIOB\": " +CREndIOB+",   \"CREndBG\": "+CREndBG+",   \"CREndTime\": "+CREndTime+                            ",   \"CRCarbs\": "+CRCarbs+"}");
+                    String crDataString = "{\"CRInitialIOB\": "+CRInitialIOB+",   \"CRInitialBG\": "+CRInitialBG+",   \"CRInitialCarbTime\": "+CRInitialCarbTime.getTime()+",   \"CREndIOB\": " +CREndIOB+",   \"CREndBG\": "+CREndBG+",   \"CREndTime\": "+CREndTime.getTime()+",   \"CRCarbs\": "+CRCarbs+"}";
+//                    log.debug("CRData is: "+crDataString);
+                    JSONObject CRDatum = new JSONObject(crDataString);
                     //console.error(CRDatum);
 
                     int CRElapsedMinutes = Math.round((CREndTime.getTime() - CRInitialCarbTime.getTime()) / 1000 / 60);
                     //console.error(CREndTime - CRInitialCarbTime, CRElapsedMinutes);
                     if ( CRElapsedMinutes < 60 || ( i==1 && mealCOB > 0 ) ) {
-                        log.debug("Ignoring"+CRElapsedMinutes+" m CR period.");
+                        log.debug("Ignoring "+CRElapsedMinutes+" m CR period.");
                     } else {
                         CRData.add(CRDatum);
                     }
@@ -476,9 +518,9 @@ public class NSService {
                 }
                 // check previous "type" value, and if it wasn't csf, set a mealAbsorption start flag
                 //console.error(type);
-                if ( type.equals("csf") ) {
+                if ( type.equals("csf") == false ) {
                     glucoseDatum.mealAbsorption = "start";
-                    log.debug(glucoseDatum.mealAbsorption+"carb absorption");
+                    log.debug(glucoseDatum.mealAbsorption+" carb absorption");
                 }
                 type="csf";
                 glucoseDatum.mealCarbs = mealCarbs;
@@ -499,7 +541,7 @@ public class NSService {
                     }
                     if ( type != "uam" ) {
                         glucoseDatum.uamAbsorption = "start";
-                        log.debug(glucoseDatum.uamAbsorption+"uannnounced meal absorption");
+                        log.debug(glucoseDatum.uamAbsorption+" unannnounced meal absorption");
                     }
                     type="uam";
                     UAMGlucoseData.add(glucoseDatum);
@@ -532,7 +574,7 @@ public class NSService {
             // debug line to print out all the things
 //            BGDateArray = BGDate.toString().split(" ");
 //            BGTime = BGDateArray[4];
-            log.debug(absorbing+" mealCOB: "+round(mealCOB, 1)+"mealCarbs:"+mealCarbs+"basalBGI:"+round(basalBGI,1)+"BGI:"+BGI+"IOB:"+iob.iob+" at "+BGTime+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
+            log.debug(absorbing+" mealCOB: "+mealCOB+" mealCarbs: "+mealCarbs+" basalBGI: "+round(basalBGI,1)+" BGI: "+BGI+" IOB: "+iob.iob+" at "+new Date(BGTime).toString()+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
         }
 
         try {
@@ -596,8 +638,13 @@ public class NSService {
             CSFGlucoseData = new ArrayList<>();
         }
 
-
-        return new JSONObject("{\"CRData\":"+CRData+",\"CSFGlucoseData\": "+CSFGlucoseData+",\"ISFGlucoseData\": "+ISFGlucoseData+",\"basalGlucoseData\": "+basalGlucoseData+"}");
+        log.debug("CRData: "+CRData.size());
+        log.debug("CSFGlucoseData: "+CSFGlucoseData.size());
+        log.debug("ISFGlucoseData: "+ISFGlucoseData.size());
+        log.debug("BasalGlucoseData: "+basalGlucoseData.size());
+        String returnJSON = "{\"CRData\":"+CRData.toString()+",\"CSFGlucoseData\": "+CSFGlucoseData.toString()+",\"ISFGlucoseData\": "+ISFGlucoseData.toString()+",\"basalGlucoseData\": "+basalGlucoseData.toString()+"}";
+//        log.debug("Returning: "+returnJSON);
+        return new JSONObject(returnJSON);
     }
 
 
