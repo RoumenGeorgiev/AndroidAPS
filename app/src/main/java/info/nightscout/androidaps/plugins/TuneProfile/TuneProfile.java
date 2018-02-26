@@ -1559,9 +1559,10 @@ public class TuneProfile implements PluginBase {
         List<Double> hourlyPumpProfile = new ArrayList<Double>();
         for(int i=0; i<24; i++) {
             hourlyBasalProfile.add(i, getBasal(i));
-            log.debug("StartBasal at hour "+i+" is "+hourlyBasalProfile.get(i));
+//            log.debug("StartBasal at hour "+i+" is "+hourlyBasalProfile.get(i));
             hourlyPumpProfile.add(i, getBasal(i));
         }
+        log.debug("1-1:"+hourlyBasalProfile.toString());
         //List<Double> basalProfile = new List<Double>;
         /*for (int i=0; i < 24; i++) {
             // autotuned basal profile
@@ -1653,6 +1654,7 @@ public class TuneProfile implements PluginBase {
                 }
             }
         }
+        log.debug("1-2:"+hourlyBasalProfile.toString());
         if (pumpBasalProfile != null && pumpBasalProfile.getBasalValues() != null) {
             for (int hour=0; hour < 24; hour++) {
                 //log.debug(newHourlyBasalProfile[hour],hourlyPumpProfile[hour].rate*1.2);
@@ -1678,26 +1680,27 @@ public class TuneProfile implements PluginBase {
         // periods before and after it that do have data to be tuned
 
         int lastAdjustedHour = 0;
+        log.debug("1-3:"+hourlyBasalProfile.toString());
         // scan through newHourlyBasalProfile and find hours where the rate is unchanged
         for (int hour=0; hour < 24; hour++) {
-            if (hourlyBasalProfile.get(hour) == newHourlyBasalProfile.get(hour)) {
+            if (hourlyBasalProfile.get(hour).equals(newHourlyBasalProfile.get(hour))) {
                 int nextAdjustedHour = 23;
                 for (int nextHour = hour; nextHour < 24; nextHour++) {
                     if (! (hourlyBasalProfile.get(nextHour) == newHourlyBasalProfile.get(nextHour))) {
                         nextAdjustedHour = nextHour;
                         break;
-                        //} else {
-                        //log.debug(nextHour, hourlyBasalProfile[nextHour].rate, newHourlyBasalProfile[nextHour].rate);
+                        } else {
+                        log.debug("At hour: "+nextHour +" " +hourlyBasalProfile.get(nextHour)+" " +newHourlyBasalProfile.get(nextHour));
                     }
                 }
                 //log.debug(hour, newHourlyBasalProfile);
                 newHourlyBasalProfile.set(hour, round( (0.8*hourlyBasalProfile.get(hour) + 0.1*newHourlyBasalProfile.get(lastAdjustedHour) + 0.1*newHourlyBasalProfile.get(nextAdjustedHour)),3));
-                log.debug("Adjusting hour "+hour+" basal from "+hourlyBasalProfile.get(hour)+" to "+newHourlyBasalProfile.get(hour)+" based on hour ",lastAdjustedHour," = "+newHourlyBasalProfile.get(lastAdjustedHour)+" and hour "+nextAdjustedHour+"="+newHourlyBasalProfile.get(nextAdjustedHour));
+                log.debug("Adjusting hour "+hour+" basal from "+hourlyBasalProfile.get(hour)+" to "+newHourlyBasalProfile.get(hour)+" based on hour "+lastAdjustedHour+" = "+newHourlyBasalProfile.get(lastAdjustedHour)+" and hour "+nextAdjustedHour+"="+newHourlyBasalProfile.get(nextAdjustedHour));
             } else {
                 lastAdjustedHour = hour;
             }
         }
-
+        log.debug("1-4:"+hourlyBasalProfile.toString());
         log.debug(newHourlyBasalProfile.toString());
         basalProfile = newHourlyBasalProfile;
 
@@ -1768,7 +1771,7 @@ public class TuneProfile implements PluginBase {
         double oldCSF = Math.round( CSF * 1000 ) / 1000;
         newCSF = Math.round( newCSF * 1000 ) / 1000;
         totalDeviations = Math.round ( totalDeviations * 1000 )/1000;
-        log.debug("totalMealCarbs:"+totalMealCarbs+"totalDeviations:"+totalDeviations+"oldCSF"+oldCSF+"fullNewCSF:"+fullNewCSF+"newCSF:"+newCSF);
+        log.debug("totalMealCarbs: "+totalMealCarbs+" totalDeviations: "+totalDeviations+" oldCSF "+oldCSF+" fullNewCSF: "+fullNewCSF+" newCSF: "+newCSF);
         // this is where CSF is set based on the outputs
         if (newCSF == 0) {
             CSF = newCSF;
