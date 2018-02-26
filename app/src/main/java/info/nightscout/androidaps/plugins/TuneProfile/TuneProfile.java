@@ -18,7 +18,6 @@ import info.nightscout.utils.Round;
 import info.nightscout.utils.SP;
 import info.nightscout.utils.SafeParse;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -80,6 +79,7 @@ public class TuneProfile implements PluginBase {
     private List<BGDatum> basalGlucoseData = new ArrayList<BGDatum>();
     private List<BGDatum> UAMGlucoseData = new ArrayList<BGDatum>();
     private List<CRDatum> CRData = new ArrayList<CRDatum>();
+    private JSONObject previousResult = null;
     //copied from IobCobCalculator
     private static LongSparseArray<IobTotal> iobTable = new LongSparseArray<>(); // oldest at index 0
     private static volatile List<BgReading> bgReadings = null; // newest at index 0
@@ -555,31 +555,7 @@ public class TuneProfile implements PluginBase {
         return (int) (avgGlucose / counter);
     }
 
-    public synchronized void trimGlucose(long start, long end){
-        // initialize glucose_data
-        if(glucose_data.size() == 0)
-            glucose_data = getBGFromTo(start, end);
-        if(glucose_data.size() < 1)
-            // no BG data
-            return ;
-
-        long milisMax = end;
-        long milisMin = start;
-
-        for (int i = 1; i < glucose_data.size(); i++) {
-            if (glucose_data.get(i).value > 38 || glucose_data.get(i).date < milisMax || glucose_data.get(i).date > milisMin) {
-                if(glucose_data.get(i).date == glucose_data.get(i-1).date){
-                    log.debug("CheckPoint 12-5 We have duplicate");
-                }
-                glucose_data.remove(i);
-            }
-        }
-//        log.debug("CheckPoint 12-6 size after trim is "+glucose_data.size());
-        return;
-    }
-
-
-    public static synchronized double getISF(){
+       public static synchronized double getISF(){
         getPlugin().getProfile();
         int toMgDl = 1;
         if(profile.equals(null))
@@ -1492,14 +1468,26 @@ public class TuneProfile implements PluginBase {
     }
 
 
-    public String tuneAllTheThings(JSONObject previousResult) throws JSONException {
+    public String tuneAllTheThings() throws JSONException {
 
 //                var previousAutotune = inputs.previousAutotune;
         //log.debug(previousAutotune);
-        JSONObject previousAutotune = previousResult;
+        JSONObject previousAutotune = previousResult.optJSONObject("basalProfile");
+//        List<Double> basalProfile = new ArrayList<Double>();
+        List<Double> basalProfile  = new ArrayList<Double>();
+        //Parsing last result
+        if(previousAutotune != null) {
+            for (int i = 0; i < 24; i++) {
+                basalProfile.add(previousAutotune.optDouble("" + i));
+            }
+        }
+        if(previousResult != null){
+            previousAutotune = previousResult;
+//            basalProfile = previousResult.getString("basalprofile");
+        }
         Profile pumpProfile = profile;
         Profile pumpBasalProfile = profile;
-        String basalProfile = previousResult.getString("basalprofile");
+
         Profile pumpISFProfile = null;
         double pumpISF = 0d;
         double pumpCarbRatio = 0d;
@@ -1572,6 +1560,7 @@ public class TuneProfile implements PluginBase {
         List<Double> hourlyPumpProfile = new ArrayList<Double>();
         for(int i=0; i<24; i++) {
             hourlyBasalProfile.add(i, getBasal(i));
+            log.debug("StartBasal at hour "+i+" is "+hourlyBasalProfile.get(i));
             hourlyPumpProfile.add(i, getBasal(i));
         }
         //List<Double> basalProfile = new List<Double>;
@@ -1631,13 +1620,13 @@ public class TuneProfile implements PluginBase {
                 }
             }
             deviations = round( deviations,3);
-            log.debug("Hour"+hour+"total deviations:"+deviations+"mg/dL");
+            log.debug("Hour "+hour+" total deviations: "+deviations+" mg/dL");
             // calculate how much less or additional basal insulin would have been required to eliminate the deviations
             // only apply 20% of the needed adjustment to keep things relatively stable
             double basalNeeded = 0.2 * deviations / ISF;
             basalNeeded = round( basalNeeded,2);
             // if basalNeeded is positive, adjust each of the 1-3 hour prior basals by 10% of the needed adjustment
-            log.debug("Hour"+hour+"basal adjustment needed:"+basalNeeded+"U/hr");
+            log.debug("Hour "+hour+" basal adjustment needed: "+basalNeeded+" U/hr");
             if (basalNeeded > 0 ) {
                 for (int offset=-3; offset < 0; offset++) {
                     int offsetHour = hour + offset;
@@ -1704,14 +1693,14 @@ public class TuneProfile implements PluginBase {
                 }
                 //log.debug(hour, newHourlyBasalProfile);
                 newHourlyBasalProfile.set(hour, round( (0.8*hourlyBasalProfile.get(hour) + 0.1*newHourlyBasalProfile.get(lastAdjustedHour) + 0.1*newHourlyBasalProfile.get(nextAdjustedHour)),3));
-                log.debug("Adjusting hour"+hour+"basal from"+hourlyBasalProfile.get(hour)+"to"+newHourlyBasalProfile.get(hour)+"based on hour",lastAdjustedHour,"="+newHourlyBasalProfile.get(lastAdjustedHour)+"and hour"+nextAdjustedHour+"="+newHourlyBasalProfile.get(nextAdjustedHour));
+                log.debug("Adjusting hour "+hour+" basal from "+hourlyBasalProfile.get(hour)+" to "+newHourlyBasalProfile.get(hour)+" based on hour ",lastAdjustedHour," = "+newHourlyBasalProfile.get(lastAdjustedHour)+" and hour "+nextAdjustedHour+"="+newHourlyBasalProfile.get(nextAdjustedHour));
             } else {
                 lastAdjustedHour = hour;
             }
         }
 
         log.debug(newHourlyBasalProfile.toString());
-        basalProfile = newHourlyBasalProfile.toString();
+        basalProfile = newHourlyBasalProfile;
 
         // Calculate carb ratio (CR) independently of CSF and ISF
         // Use the time period from meal bolus/carbs until COB is zero and IOB is < currentBasal/2
@@ -1812,15 +1801,15 @@ public class TuneProfile implements PluginBase {
             double maxCR = pumpCarbRatio * autotuneMax;
             double minCR = pumpCarbRatio * autotuneMin;
             if (newCR > maxCR) {
-                log.debug("Limiting CR to"+round(maxCR,2)+"(which is"+autotuneMax+"* pump CR of"+pumpCarbRatio+")");
+                log.debug("Limiting CR to "+round(maxCR,2)+"(which is"+autotuneMax+"* pump CR of"+pumpCarbRatio+")");
                 newCR = maxCR;
             } else if (newCR < minCR) {
-                log.debug("Limiting CR to"+round(minCR,2)+"(which is"+autotuneMin+"* pump CR of"+pumpCarbRatio+")");
+                log.debug("Limiting CR to "+round(minCR,2)+"(which is"+autotuneMin+"* pump CR of"+pumpCarbRatio+")");
                 newCR = minCR;
             } //else { log.debug("newCR",newCR,"is close enough to",pumpCarbRatio); }
         }
         newCR = Math.round( newCR * 1000 ) / 1000;
-        log.debug("oldCR:"+carbRatio+"fullNewCR:"+fullNewCR+"newCR:"+newCR);
+        log.debug("oldCR: "+carbRatio+" fullNewCR: "+fullNewCR+" newCR: "+newCR);
         // this is where CR is set based on the outputs
         //var ISFFromCRAndCSF = ISF;
         if (newCR != 0) {
@@ -1912,7 +1901,7 @@ public class TuneProfile implements PluginBase {
         p50deviation = Math.round( p50deviation * 1000 ) / 1000;
         p50BGI = Math.round( p50BGI * 1000 ) / 1000;
         adjustedISF = Math.round( adjustedISF * 1000 ) / 1000;
-        log.debug("p50deviation:"+p50deviation+"p50BGI"+p50BGI+"p50ratios:"+p50ratios+"Old ISF:"+ISF+"fullNewISF:"+fullNewISF+"adjustedISF:"+adjustedISF+"newISF:"+newISF);
+        log.debug("p50deviation: "+p50deviation+" p50BGI "+p50BGI+" p50ratios: "+p50ratios+" Old ISF: "+ISF+" fullNewISF: "+fullNewISF+" adjustedISF: "+adjustedISF+" newISF: "+newISF);
 
         if (newISF != 0d) {
             ISF = newISF;
@@ -1921,7 +1910,7 @@ public class TuneProfile implements PluginBase {
 
         // reconstruct updated version of previousAutotune as autotuneOutput
         JSONObject autotuneOutput = previousAutotune;
-        autotuneOutput.put("basalprofile",  basalProfile);
+        autotuneOutput.put("basalprofile",  basalProfile.toString());
         //isfProfile.sensitivity = ISF;
         //autotuneOutput.put("isfProfile", isfProfile);
         autotuneOutput.put("sens", ISF);
@@ -1929,7 +1918,7 @@ public class TuneProfile implements PluginBase {
         //carbRatio = ISF / CSF;
         carbRatio = Math.round( carbRatio * 1000 ) / 1000;
         autotuneOutput.put("carb_ratio" , carbRatio);
-
+        previousResult = autotuneOutput;
         return autotuneOutput.toString();
     }
 
@@ -1963,34 +1952,18 @@ public class TuneProfile implements PluginBase {
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
         } else {
-
-            try {
-                categorizeBGDatums(starttime, endTime);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
             for (int i = daysBack; i > 0; i--) {
                 tunedBasalsInit();
-                getPlugin().basicResult(i);
-                isfResult += tunedISF;
-                for(int ii=0; ii<24; ii++){
-//                    log.debug(" basalsResult adding for "+ii+" value is "+basalsResult.get(ii)+" adding "+tunedBasals.get(ii));
-                    basalsResult.set(ii, (basalsResult.get(ii) + tunedBasals.get(ii)));
+                try {
+                    categorizeBGDatums(starttime, endTime);
+                    tuneAllTheThings();
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
             }
         }
         //
-        for(int i=0; i<24;i++){
-            basalsResult.set(i, round(basalsResult.get(i)/daysBack, 3));
-        }
-            int devisor = 1;
-            if(profile.getUnits().equals("mmol"))
-                devisor = 18;
-//            isfResult = tunedISF;
-                isfResult = isfResult / daysBack;
-            return displayBasalsResult()+"\nISF "+round(getISF()/devisor,2)+" -> "+round(isfResult/devisor,2)+"\nLast profile change was: "+lastProfileChange.toLocaleString();
+        return "Something was tuned(maybe)!";
     }
 
     String basicResult(int daysBack) throws IOException, ParseException {
