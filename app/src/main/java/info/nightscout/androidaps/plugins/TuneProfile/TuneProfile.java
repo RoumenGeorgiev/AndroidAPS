@@ -1472,8 +1472,10 @@ public class TuneProfile implements PluginBase {
 
 //                var previousAutotune = inputs.previousAutotune;
         //log.debug(previousAutotune);
-        JSONObject previousAutotune = previousResult.optJSONObject("basalProfile");
-//        List<Double> basalProfile = new ArrayList<Double>();
+        JSONObject previousAutotune = new JSONObject();
+        if(previousResult != null)
+            previousAutotune = previousResult.optJSONObject("basalProfile");
+
         List<Double> basalProfile  = new ArrayList<Double>();
         //Parsing last result
         if(previousAutotune != null) {
@@ -1481,10 +1483,7 @@ public class TuneProfile implements PluginBase {
                 basalProfile.add(previousAutotune.optDouble("" + i));
             }
         }
-        if(previousResult != null){
-            previousAutotune = previousResult;
-//            basalProfile = previousResult.getString("basalprofile");
-        }
+
         Profile pumpProfile = profile;
         Profile pumpBasalProfile = profile;
 
