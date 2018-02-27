@@ -1995,22 +1995,33 @@ public class TuneProfile implements PluginBase {
                     tunedProfile.add(Double.parseDouble(basalProfile.get(i)));
                 }
             }
-            String line = "-------------------------\n";
+            String line = "-------------------------------------------\n";
             String result = line;
             result += "| Hour | Profile | Autotune |\n";
             result += line;
             for (int i = 0; i < 24; i++) {
                 if(tunedProfile.size() < i || tunedProfile.size() == 0)
                     return "Error at index "+i+" or empty basalprofile<List>";
-                result += "| " + i + " | " + round(getBasal(i),3) + " -> " +tunedProfile.get(i)+" |";
+                String basalString = ""+round(getBasal(i),3);
+                for(int ii=1; ii<7-basalString.length();ii++){
+                    basalString = basalString + " ";
+                }
+                String tunedString = ""+round(tunedProfile.get(i),3);
+                for(int ii=1; ii<8-basalString.length();ii++){
+                    tunedString = tunedString + " ";
+                }
+                String hourString = ""+i;
+                if(i<10)
+                    hourString = " "+i;
+                result += "|   " + hourString + "    | " + basalString + " | " +tunedString+" |\n";
                 result += line;
             }
             // show ISF CR and CSF
-            result += "| ISF | "+profile.getIsf()+" | "+previousResult.optDouble("sens", 0d)+" |\n";
+            result += "|  ISF  |    "+profile.getIsf()+"    |    "+round(previousResult.optDouble("sens", 0d),3)+"     |\n";
             result += line;
-            result += "| CR | "+profile.getIc()+" | "+previousResult.optDouble("carb_ratio", 0d)+" |\n";
+            result += "|   CR   |    "+profile.getIc()+"    |    "+round(previousResult.optDouble("carb_ratio", 0d),3)+"     |\n";
             result += line;
-            result += "| CSF | "+round(profile.getIsf()/profile.getIc(),3)+" | "+previousResult.optDouble("csf", 0d)+" |\n";
+            result += "|  CSF  |    "+round(profile.getIsf()/profile.getIc(),3)+"    |    "+round(previousResult.optDouble("csf", 0d),3)+"     |\n";
             result += line;
             //
             return result;
