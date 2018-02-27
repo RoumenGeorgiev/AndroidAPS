@@ -1955,6 +1955,7 @@ public class TuneProfile implements PluginBase {
         long starttime = endTime - (24 * 60 * 60 * 1000L);
         Date lastProfileChange = NSService.lastProfileChange();
         int toMgDl = 1;
+        getProfile();
         if(profile.equals(null))
             return null;
         if(profile.getUnits().equals("mmol"))
