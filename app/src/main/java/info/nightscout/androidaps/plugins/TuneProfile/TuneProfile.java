@@ -1954,8 +1954,11 @@ public class TuneProfile implements PluginBase {
         long endTime = c.getTimeInMillis();
         long starttime = endTime - (24 * 60 * 60 * 1000L);
         Date lastProfileChange = NSService.lastProfileChange();
-
-
+        int toMgDl = 1;
+        if(profile.equals(null))
+            return null;
+        if(profile.getUnits().equals("mmol"))
+            toMgDl = 18;
         //Check if Wifi is Connected
         if(!nsService.isWifiConnected()){
            // return "READ THE WARNING!";
@@ -2003,11 +2006,11 @@ public class TuneProfile implements PluginBase {
                 if(tunedProfile.size() < i || tunedProfile.size() == 0)
                     return "Error at index "+i+" or empty basalprofile<List>";
                 String basalString = ""+round(getBasal(i),3);
-                for(int ii=1; ii<7-basalString.length();ii++){
+                while(basalString.length()<7){
                     basalString = basalString + " ";
                 }
                 String tunedString = ""+round(tunedProfile.get(i),3);
-                for(int ii=1; ii<8-basalString.length();ii++){
+                while(tunedString.length()<8){
                     tunedString = tunedString + " ";
                 }
                 String hourString = ""+i;
@@ -2017,7 +2020,7 @@ public class TuneProfile implements PluginBase {
                 result += line;
             }
             // show ISF CR and CSF
-            result += "|  ISF  |    "+profile.getIsf()+"    |    "+round(previousResult.optDouble("sens", 0d),3)+"     |\n";
+            result += "|  ISF  |    "+profile.getIsf()+"    |    "+round(previousResult.optDouble("sens", 0d)/toMgDl,3)+"     |\n";
             result += line;
             result += "|   CR   |    "+profile.getIc()+"    |    "+round(previousResult.optDouble("carb_ratio", 0d),3)+"     |\n";
             result += line;
