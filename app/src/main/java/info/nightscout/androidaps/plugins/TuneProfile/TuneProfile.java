@@ -1394,7 +1394,7 @@ public class TuneProfile implements PluginBase {
             // debug line to print out all the things
 //            BGDateArray = BGDate.toString().split(" ");
 //            BGTime = BGDateArray[4];
-            log.debug(absorbing+" mealCOB: "+mealCOB+" mealCarbs: "+mealCarbs+" basalBGI: "+round(basalBGI,1)+" BGI: "+BGI+" IOB: "+iob.iob+" at "+new Date(BGTime).toString()+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
+//            log.debug(absorbing+" mealCOB: "+mealCOB+" mealCarbs: "+mealCarbs+" basalBGI: "+round(basalBGI,1)+" BGI: "+BGI+" IOB: "+iob.iob+" at "+new Date(BGTime).toString()+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
         }
 
         try {
@@ -1486,7 +1486,7 @@ public class TuneProfile implements PluginBase {
 
         Profile pumpProfile = profile;
         Profile pumpBasalProfile = profile;
-
+        //TODO: Mabe get real pump values like in the original but use profile.ISF for now
         Profile pumpISFProfile = null;
         double pumpISF = 0d;
         double pumpCarbRatio = 0d;
@@ -1506,16 +1506,24 @@ public class TuneProfile implements PluginBase {
         if(profile.getUnits().equals("mmol"))
             toMgDl = 18;
         double ISF = profile.getIsf()*toMgDl;
+
         //log.debug(ISF);
         double carbRatio = profile.getIc();
         //log.debug(carbRatio);
         double CSF = ISF / carbRatio;
+
+        //Compy profile values to pump ones
+        pumpISF = ISF;
+        log.debug("PumpISF is: "+pumpISF);
+        pumpCarbRatio = carbRatio;
+        pumpCSF = CSF;
         // conditional on there being a pump profile; if not then skip
         if (pumpProfile != null) { pumpISFProfile = pumpProfile; }
         if (pumpISFProfile != null && pumpISFProfile.getIsf() != null) {
-            pumpISF = pumpISFProfile.getIsf();
+            pumpISF = pumpISFProfile.getIsf()*toMgDl;
             pumpCarbRatio = pumpProfile.getIc();
             pumpCSF = pumpISF / pumpCarbRatio;
+            log.debug("After getting pumpProfile: pumpISF is "+pumpISF+" pumpCSF "+pumpCSF+" pumpCarbRatio "+pumpCarbRatio);
         }
         if (carbRatio == 0d) { carbRatio = pumpCarbRatio; }
         if (CSF == 0d) { CSF = pumpCSF; }
@@ -1567,7 +1575,6 @@ public class TuneProfile implements PluginBase {
 //            log.debug("StartBasal at hour "+i+" is "+hourlyBasalProfile.get(i));
             hourlyPumpProfile.add(i, getBasal(i));
         }
-        log.debug("1-1:"+hourlyBasalProfile.toString());
         //List<Double> basalProfile = new List<Double>;
         /*for (int i=0; i < 24; i++) {
             // autotuned basal profile
@@ -1662,7 +1669,6 @@ public class TuneProfile implements PluginBase {
                 }
             }
         }
-        log.debug("1-2:"+hourlyBasalProfile.toString());
         if (pumpBasalProfile != null && pumpBasalProfile.getBasalValues() != null) {
             for (int hour=0; hour < 24; hour++) {
                 //log.debug(newHourlyBasalProfile[hour],hourlyPumpProfile[hour].rate*1.2);
@@ -1687,7 +1693,6 @@ public class TuneProfile implements PluginBase {
         // when no adjustments are needed to a particular hour, we should adjust it toward the average of the
         // periods before and after it that do have data to be tuned
         int lastAdjustedHour = 0;
-        log.debug("1-3:"+hourlyBasalProfile.toString());
         // scan through newHourlyBasalProfile and find hours where the rate is unchanged
         for (int hour=0; hour < 24; hour++) {
             if (hourlyBasalProfile.get(hour).equals(newHourlyBasalProfile.get(hour))) {
@@ -1707,9 +1712,6 @@ public class TuneProfile implements PluginBase {
                 lastAdjustedHour = hour;
             }
         }
-        log.debug("1-4:"+hourlyBasalProfile.toString());
-        log.debug(newHourlyBasalProfile.toString());
-        log.debug(hourlyBasalProfile.toString());
         basalProfile = newHourlyBasalProfile;
 
         // Calculate carb ratio (CR) independently of CSF and ISF
@@ -1769,7 +1771,7 @@ public class TuneProfile implements PluginBase {
             double maxCSF = pumpCSF * autotuneMax;
             double minCSF = pumpCSF * autotuneMin;
             if (newCSF > maxCSF) {
-                log.debug("Limiting CSF to"+round(maxCSF,2)+"(which is"+autotuneMax+"* pump CSF of"+pumpCSF+")");
+                log.debug("Limiting CSF to "+round(maxCSF,2)+"(which is "+autotuneMax+"* pump CSF of "+pumpCSF+")");
                 newCSF = maxCSF;
             } else if (newCSF < minCSF) {
                 log.debug("Limiting CSF to"+round(minCSF,2)+"(which is"+autotuneMin+"* pump CSF of"+pumpCSF+")");
@@ -1853,8 +1855,8 @@ public class TuneProfile implements PluginBase {
         Collections.sort(ratios);
         double p50deviation = IobCobCalculatorPlugin.percentile(ISFdeviations.toArray(new Double[ISFdeviations.size()]), 0.50);
         double p50BGI =  IobCobCalculatorPlugin.percentile(BGIs.toArray(new Double[BGIs.size()]), 0.50);
-        double p50ratios = Math.round(  IobCobCalculatorPlugin.percentile(ratios.toArray(new Double[ratios.size()]), 0.50) * 1000)/1000;
-        double fullNewISF;
+        double p50ratios = round(  IobCobCalculatorPlugin.percentile(ratios.toArray(new Double[ratios.size()]), 0.50),3);
+        double fullNewISF = 0d;
         if (count < 10) {
             // leave ISF unchanged if fewer than 5 ISF data points
             fullNewISF = ISF;
@@ -1862,7 +1864,7 @@ public class TuneProfile implements PluginBase {
             // calculate what adjustments to ISF would have been necessary to bring median deviation to zero
             fullNewISF = ISF * p50ratios;
         }
-        fullNewISF = Math.round( fullNewISF * 1000 ) / 1000;
+        fullNewISF = round( fullNewISF,3);
         // adjust the target ISF to be a weighted average of fullNewISF and pumpISF
         double adjustmentFraction;
 /*
@@ -1878,19 +1880,20 @@ public class TuneProfile implements PluginBase {
         double minISF = pumpISF / autotuneMax;
         double adjustedISF = 0d;
         double newISF = 0d;
-        if (pumpISF == 0) {
+        if (pumpISF != 0) {
             if ( fullNewISF < 0 ) {
                 adjustedISF = ISF;
+                log.debug("fullNewISF < 0 setting adjustedISF to "+adjustedISF);
             } else {
                 adjustedISF = adjustmentFraction*fullNewISF + (1-adjustmentFraction)*pumpISF;
             }
             // cap adjustedISF before applying 10%
             //log.debug(adjustedISF, maxISF, minISF);
             if (adjustedISF > maxISF) {
-                log.debug("Limiting adjusted ISF of"+round(adjustedISF,2)+"to"+round(maxISF,2)+"(which is pump ISF of"+pumpISF+"/"+autotuneMin+")");
+                log.debug("Limiting adjusted ISF of "+round(adjustedISF,2)+" to "+round(maxISF,2)+"(which is pump ISF of "+pumpISF+"/"+autotuneMin+")");
                 adjustedISF = maxISF;
             } else if (adjustedISF < minISF) {
-                log.debug("Limiting adjusted ISF of"+round(adjustedISF,2)+"to"+round(minISF,2)+"(which is pump ISF of"+pumpISF+"/"+autotuneMax+")");
+                log.debug("Limiting adjusted ISF of"+round(adjustedISF,2)+" to "+round(minISF,2)+"(which is pump ISF of "+pumpISF+"/"+autotuneMax+")");
                 adjustedISF = minISF;
             }
 
@@ -1919,7 +1922,9 @@ public class TuneProfile implements PluginBase {
 
 
         // reconstruct updated version of previousAutotune as autotuneOutput
-        JSONObject autotuneOutput = previousAutotune;
+        JSONObject autotuneOutput = new JSONObject();
+        if(previousAutotune != null)
+            autotuneOutput = new JSONObject(previousAutotune.toString());
         autotuneOutput.put("basalprofile",  basalProfile.toString());
         //isfProfile.sensitivity = ISF;
         //autotuneOutput.put("isfProfile", isfProfile);
@@ -1928,7 +1933,7 @@ public class TuneProfile implements PluginBase {
         //carbRatio = ISF / CSF;
         carbRatio = Math.round( carbRatio * 1000 ) / 1000;
         autotuneOutput.put("carb_ratio" , carbRatio);
-        previousResult = autotuneOutput;
+        previousResult = new JSONObject(autotuneOutput.toString());
         return autotuneOutput.toString();
     }
 
