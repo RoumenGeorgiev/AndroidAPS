@@ -152,7 +152,7 @@ public class NSService {
                 treatments.add(treatment);
 //                log.debug("Treatment got has date "+new Date(treatment.date).toGMTString());
             }
-//            log.debug("Treatment Size of treatments: "+treatments.size());
+            log.debug("Treatment Size of treatments: "+treatments.size()+" from "+fromDateString+" to "+toDateString );
 
 
         } catch (JSONException e) {

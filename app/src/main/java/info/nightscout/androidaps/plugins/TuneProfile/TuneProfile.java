@@ -18,6 +18,7 @@ import info.nightscout.utils.Round;
 import info.nightscout.utils.SP;
 import info.nightscout.utils.SafeParse;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -1112,7 +1113,6 @@ public class TuneProfile implements PluginBase {
         List<Treatment> fullHistory = new ArrayList<Treatment>();//IOBInputs.history; TODO: get treatments with IOB
         double glucoseDatumAvgDelta = 0d;
         double glucoseDatumDelta = 0d;
-        log.debug("Categorize 1 - bucketedData.size() "+bucketedData.size());
         for (int i=bucketedData.size()-5; i > 0; --i) {
             BGDatum glucoseDatum = bucketedData.get(i);
             glucoseDatumAvgDelta = 0d;
@@ -1473,9 +1473,10 @@ public class TuneProfile implements PluginBase {
 //                var previousAutotune = inputs.previousAutotune;
         //log.debug(previousAutotune);
         JSONObject previousAutotune = new JSONObject();
-        if(previousResult != null)
+        if(previousResult != null) {
             previousAutotune = previousResult.optJSONObject("basalProfile");
-
+            log.debug("PrevResult is: " + previousAutotune.toString());
+        }
         List<Double> basalProfile  = new ArrayList<Double>();
         //Parsing last result
         if(previousAutotune != null) {
@@ -1925,7 +1926,7 @@ public class TuneProfile implements PluginBase {
         JSONObject autotuneOutput = new JSONObject();
         if(previousAutotune != null)
             autotuneOutput = new JSONObject(previousAutotune.toString());
-        autotuneOutput.put("basalprofile",  basalProfile.toString());
+        autotuneOutput.put("basalProfile",  basalProfile.toString());
         //isfProfile.sensitivity = ISF;
         //autotuneOutput.put("isfProfile", isfProfile);
         autotuneOutput.put("sens", ISF);
@@ -1962,23 +1963,59 @@ public class TuneProfile implements PluginBase {
 
         // check if daysBack goes before the last profile switch
         if((System.currentTimeMillis() - (daysBack * 24 * 60 * 60 * 1000L)) < lastProfileChange.getTime()){
-            return "ERROR -> I cannot tune before the last profile switch!("+(System.currentTimeMillis() - lastProfileChange.getTime()) / (24 * 60 * 60 * 1000L)+" days ago)";
+            //return "ERROR -> I cannot tune before the last profile switch!("+(System.currentTimeMillis() - lastProfileChange.getTime()) / (24 * 60 * 60 * 1000L)+" days ago)";
         }
         if(daysBack < 1){
             return "Sorry I cannot do it for less than 1 day!";
         } else {
             for (int i = daysBack; i > 0; i--) {
-                tunedBasalsInit();
+//                tunedBasalsInit();
+                long timeBack = (i-1) * 24 * 60 * 60 * 1000L;
                 try {
-                    categorizeBGDatums(starttime, endTime);
+                    log.debug("NSService asked for data from "+formatDate(new Date(starttime))+" to "+formatDate(new Date(endTime)));
+                    categorizeBGDatums(starttime-timeBack, endTime-timeBack);
                     tuneAllTheThings();
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
             }
         }
-        //
-        return "Something was tuned(maybe)!";
+        if(previousResult != null) {
+            String previousAutotune = previousResult.optString("basalProfile");
+            log.debug("PrevResult full: "+previousResult.toString());
+            log.debug("PrevResult: "+previousAutotune.toString());
+            previousAutotune = previousAutotune.substring(0, previousAutotune.length() - 1);
+            previousAutotune = previousAutotune.substring(1, previousAutotune.length());
+            log.debug("PrevResult after trim : "+previousAutotune.toString());
+            List<String> basalProfile  = new ArrayList<String>(Arrays.asList(previousAutotune.split(", ")));
+            List<Double> tunedProfile = new ArrayList<Double>();
+            //Parsing last result
+            if(basalProfile.size() > 0) {
+                for (int i = 0; i < 24; i++) {
+                    tunedProfile.add(Double.parseDouble(basalProfile.get(i)));
+                }
+            }
+            String line = "-------------------------\n";
+            String result = line;
+            result += "| Hour | Profile | Autotune |\n";
+            result += line;
+            for (int i = 0; i < 24; i++) {
+                if(tunedProfile.size() < i || tunedProfile.size() == 0)
+                    return "Error at index "+i+" or empty basalprofile<List>";
+                result += "| " + i + " | " + round(getBasal(i),3) + " -> " +tunedProfile.get(i)+" |";
+                result += line;
+            }
+            // show ISF CR and CSF
+            result += "| ISF | "+profile.getIsf()+" | "+previousResult.optDouble("sens", 0d)+" |\n";
+            result += line;
+            result += "| CR | "+profile.getIc()+" | "+previousResult.optDouble("carb_ratio", 0d)+" |\n";
+            result += line;
+            result += "| CSF | "+round(profile.getIsf()/profile.getIc(),3)+" | "+previousResult.optDouble("csf", 0d)+" |\n";
+            result += line;
+            //
+            return result;
+        } else
+            return "No Result";
     }
 
     String basicResult(int daysBack) throws IOException, ParseException {
@@ -2222,6 +2259,11 @@ public class TuneProfile implements PluginBase {
         c.set(Calendar.MILLISECOND, 0);
         long passed = date - c.getTimeInMillis();
         return (int) (passed / 1000);
+    }
+
+    public String formatDate(Date date){
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        return dateFormat.format(date);
     }
 
     public static double round(double value, int places) {
