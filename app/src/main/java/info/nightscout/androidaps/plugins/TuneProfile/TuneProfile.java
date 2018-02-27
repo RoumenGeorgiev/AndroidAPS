@@ -1500,7 +1500,12 @@ public class TuneProfile implements PluginBase {
         //log.debug(basalProfile);
 //        var isfProfile = previousAutotune.isfProfile;
         //log.debug(isfProfile);
-        double ISF = profile.getIsf();
+        int toMgDl = 1;
+        if(profile.equals(null))
+            return null;
+        if(profile.getUnits().equals("mmol"))
+            toMgDl = 18;
+        double ISF = profile.getIsf()*toMgDl;
         //log.debug(ISF);
         double carbRatio = profile.getIc();
         //log.debug(carbRatio);
@@ -1552,7 +1557,7 @@ public class TuneProfile implements PluginBase {
 
         CRTotalInsulin = Math.round(CRTotalInsulin*1000)/1000;
         double totalCR = Math.round( CRTotalCarbs / CRTotalInsulin * 1000 )/1000;
-        log.debug("CRTotalCarbs:",CRTotalCarbs,"CRTotalInsulin:",CRTotalInsulin,"totalCR:",totalCR);
+        log.debug("CRTotalCarbs: "+CRTotalCarbs+" CRTotalInsulin: "+CRTotalInsulin+" totalCR: "+totalCR);
 
         // convert the basal profile to hourly if it isn't already
         List<Double> hourlyBasalProfile = new ArrayList<Double>();
@@ -1599,7 +1604,10 @@ public class TuneProfile implements PluginBase {
         }
         *///log.debug(hourlyPumpProfile);
         //log.debug(hourlyBasalProfile);
-        List<Double> newHourlyBasalProfile = hourlyBasalProfile;
+        List<Double> newHourlyBasalProfile = new ArrayList<Double>();
+        for(int i=0; i<hourlyBasalProfile.size();i++){
+            newHourlyBasalProfile.add(hourlyBasalProfile.get(i));
+        }
 
         // look at net deviations for each hour
         for (int hour=0; hour < 24; hour++) {
@@ -1678,7 +1686,6 @@ public class TuneProfile implements PluginBase {
         // some hours of the day rarely have data to tune basals due to meals.
         // when no adjustments are needed to a particular hour, we should adjust it toward the average of the
         // periods before and after it that do have data to be tuned
-
         int lastAdjustedHour = 0;
         log.debug("1-3:"+hourlyBasalProfile.toString());
         // scan through newHourlyBasalProfile and find hours where the rate is unchanged
@@ -1702,6 +1709,7 @@ public class TuneProfile implements PluginBase {
         }
         log.debug("1-4:"+hourlyBasalProfile.toString());
         log.debug(newHourlyBasalProfile.toString());
+        log.debug(hourlyBasalProfile.toString());
         basalProfile = newHourlyBasalProfile;
 
         // Calculate carb ratio (CR) independently of CSF and ISF
@@ -1944,7 +1952,7 @@ public class TuneProfile implements PluginBase {
 
         //Check if Wifi is Connected
         if(!nsService.isWifiConnected()){
-            return "READ THE WARNING!";
+           // return "READ THE WARNING!";
         }
 
         // check if daysBack goes before the last profile switch
