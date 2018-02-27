@@ -1475,7 +1475,7 @@ public class TuneProfile implements PluginBase {
         JSONObject previousAutotune = new JSONObject();
         if(previousResult != null) {
             previousAutotune = previousResult.optJSONObject("basalProfile");
-            log.debug("PrevResult is: " + previousAutotune.toString());
+            log.debug("PrevResult is: " + previousResult.toString());
         }
         List<Double> basalProfile  = new ArrayList<Double>();
         //Parsing last result
@@ -2011,17 +2011,18 @@ public class TuneProfile implements PluginBase {
                     basalString = basalString + " ";
                 }
                 String tunedString = ""+round(tunedProfile.get(i),3);
-                while(tunedString.length()<8){
+                while(tunedString.length()<10){
                     tunedString = tunedString + " ";
                 }
                 String hourString = ""+i;
                 if(i<10)
-                    hourString = " "+i;
+                    hourString = i+"   ";
                 result += "|   " + hourString + "    | " + basalString + " | " +tunedString+" |\n";
-                result += line;
+
             }
+            result += line;
             // show ISF CR and CSF
-            result += "|  ISF  |    "+profile.getIsf()+"    |    "+round(previousResult.optDouble("sens", 0d)/toMgDl,3)+"     |\n";
+            result += "|  ISF    |    "+profile.getIsf()+"    |    "+round(previousResult.optDouble("sens", 0d)/toMgDl,3)+"     |\n";
             result += line;
             result += "|   CR   |    "+profile.getIc()+"    |    "+round(previousResult.optDouble("carb_ratio", 0d),3)+"     |\n";
             result += line;
