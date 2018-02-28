@@ -5,12 +5,18 @@ import android.support.v4.util.LongSparseArray;
 import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.Intervals;
+import info.nightscout.androidaps.data.Iob;
 import info.nightscout.androidaps.data.IobTotal;
+import info.nightscout.androidaps.data.NonOverlappingIntervals;
 import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.BGDatum;
 import info.nightscout.androidaps.db.BgReading;
+import info.nightscout.androidaps.db.ExtendedBolus;
+import info.nightscout.androidaps.db.TemporaryBasal;
 import info.nightscout.androidaps.db.Treatment;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensResult;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.utils.Round;
@@ -33,6 +39,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
+
 
 /**
  * Created by Rumen Georgiev on 1/29/2018.
@@ -68,12 +75,8 @@ public class TuneProfile implements PluginBase {
     private static TuneProfile tuneProfile = null;
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
     public static Profile profile;
-    public static List<Double> tunedBasals = new ArrayList<Double>();
     public static List<Double> basalsResult = new ArrayList<Double>();
-    public List<BgReading> glucose_data = new ArrayList<BgReading>();
     public static List<Treatment> treatments;
-    private static final Object dataLock = new Object();
-    private static double tunedISF = 0d;
     private List<BGDatum> CSFGlucoseData = new ArrayList<BGDatum>();
     private List<BGDatum> ISFGlucoseData = new ArrayList<BGDatum>();
     private List<BGDatum> basalGlucoseData = new ArrayList<BGDatum>();
@@ -82,11 +85,8 @@ public class TuneProfile implements PluginBase {
     private JSONObject previousResult = null;
     //copied from IobCobCalculator
     private static LongSparseArray<IobTotal> iobTable = new LongSparseArray<>(); // oldest at index 0
-    private static volatile List<BgReading> bgReadings = null; // newest at index 0
-    private static volatile List<BgReading> bucketed_data = null;
-    private static LongSparseArray<AutosensData> autosensDataTable = new LongSparseArray<>(); // oldest at index 0
-    List<info.nightscout.androidaps.plugins.TuneProfile.AutosensData.CarbsInPast> activeCarbsList = new ArrayList<>();
-
+    private static Intervals<TemporaryBasal> tempBasals = new NonOverlappingIntervals<>();
+    private static Intervals<ExtendedBolus> extendedBoluses = new NonOverlappingIntervals<>();
     private NSService nsService = new NSService();
 
     public TuneProfile() throws IOException {
@@ -180,27 +180,6 @@ public class TuneProfile implements PluginBase {
         profile = MainApp.getConfigBuilder().getProfile();
     }
 
-/*    public void getGlucoseData(long start, long end) {
-        //get glucoseData for 1 day back
-        long oneDayBack = end - 24 * 60 * 60 *1000L;
-        glucose_data = MainApp.getDbHelper().getBgreadingsDataFromTime(oneDayBack, true);
-//        log.debug("CheckPoint -121 - glucose_data.size is "+glucose_data.size()+" from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
-        int initialSize = glucose_data.size();
-        if(glucose_data.size() < 1) {
-            // no BG data
-            log.debug("CheckPoint 12-4 - No BG data");
-            return;
-        }
-        for (int i = 1; i < glucose_data.size(); i++) {
-            if (glucose_data.get(i).value > 38) {
-                if(glucose_data.get(i).date > end || glucose_data.get(i).date == glucose_data.get(i-1).date)
-                    glucose_data.remove(i);
-            }
-        }
-//        log.debug("CheckPoint 12-2 - glucose_data.size is "+glucose_data.size()+"("+initialSize+") from "+new Date(oneDayBack).toString()+" to "+new Date(end).toString());
-
-    }*/
-
     public static synchronized Double getBasal(Integer hour){
         getPlugin().getProfile();
         if(profile.equals(null))
@@ -221,6 +200,89 @@ public class TuneProfile implements PluginBase {
         return rouded;
     }
 
+    public IobTotal getCalculationToTimeTreatments(long time) {
+        IobTotal total = new IobTotal(time);
+
+        Profile profile = MainApp.getConfigBuilder().getProfile();
+        if (profile == null)
+            return total;
+
+        double dia = profile.getDia();
+
+        for (Integer pos = 0; pos < treatments.size(); pos++) {
+            Treatment t = treatments.get(pos);
+            if (!t.isValid) continue;
+            if (t.date > time) continue;
+            Iob tIOB = t.iobCalc(time, dia);
+            total.iob += tIOB.iobContrib;
+            total.activity += tIOB.activityContrib;
+            if (t.date > total.lastBolusTime)
+                total.lastBolusTime = t.date;
+            if (!t.isSMB) {
+                // instead of dividing the DIA that only worked on the bilinear curves,
+                // multiply the time the treatment is seen active.
+                long timeSinceTreatment = time - t.date;
+                long snoozeTime = t.date + (long) (timeSinceTreatment * SP.getDouble("openapsama_bolussnooze_dia_divisor", 2.0));
+                Iob bIOB = t.iobCalc(snoozeTime, dia);
+                total.bolussnooze += bIOB.iobContrib;
+            }
+        }
+
+        if (!ConfigBuilderPlugin.getActivePump().isFakingTempsByExtendedBoluses())
+            synchronized (extendedBoluses) {
+                for (Integer pos = 0; pos < extendedBoluses.size(); pos++) {
+                    ExtendedBolus e = extendedBoluses.get(pos);
+                    if (e.date > time) continue;
+                    IobTotal calc = e.iobCalc(time);
+                    total.plus(calc);
+                }
+            }
+        return total;
+    }
+
+    public IobTotal getCalculationToTimeTempBasals(long time) {
+        IobTotal total = new IobTotal(time);
+        synchronized (tempBasals) {
+            for (Integer pos = 0; pos < tempBasals.size(); pos++) {
+                TemporaryBasal t = tempBasals.get(pos);
+                if (t.date > time) continue;
+                IobTotal calc = t.iobCalc(time);
+                log.debug("BasalIOB " + new Date(time) + " >>> " + calc.basaliob);
+                total.plus(calc);
+                if (!t.isEndingEvent()) {
+                    total.lastTempDate = t.date;
+                    total.lastTempDuration = t.durationInMinutes;
+                    total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                }
+
+            }
+        }
+        if (ConfigBuilderPlugin.getActivePump().isFakingTempsByExtendedBoluses()) {
+            IobTotal totalExt = new IobTotal(time);
+            synchronized (extendedBoluses) {
+                for (Integer pos = 0; pos < extendedBoluses.size(); pos++) {
+                    ExtendedBolus e = extendedBoluses.get(pos);
+                    if (e.date > time) continue;
+                    IobTotal calc = e.iobCalc(time);
+                    totalExt.plus(calc);
+                    TemporaryBasal t = new TemporaryBasal(e);
+                    if (!t.isEndingEvent() && t.date > total.lastTempDate) {
+                        total.lastTempDate = t.date;
+                        total.lastTempDuration = t.durationInMinutes;
+                        total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                    }
+                }
+            }
+            // Convert to basal iob
+            totalExt.basaliob = totalExt.iob;
+            totalExt.iob = 0d;
+            totalExt.netbasalinsulin = totalExt.extendedBolusInsulin;
+            totalExt.hightempinsulin = totalExt.extendedBolusInsulin;
+            total.plus(totalExt);
+        }
+        return total;
+    }
+
 
     public static IobTotal calculateFromTreatmentsAndTemps(long time) {
         long now = System.currentTimeMillis();
@@ -231,8 +293,8 @@ public class TuneProfile implements PluginBase {
         } else {
             //log.debug(">>> calculateFromTreatmentsAndTemps Cache miss " + new Date(time).toLocaleString());
         }
-        IobTotal bolusIob = MainApp.getConfigBuilder().getCalculationToTimeTreatments(time).round();
-        IobTotal basalIob = MainApp.getConfigBuilder().getCalculationToTimeTempBasals(time).round();
+        IobTotal bolusIob = getPlugin().getCalculationToTimeTreatments(time).round();
+        IobTotal basalIob = getPlugin().getCalculationToTimeTempBasals(time).round();
 
         IobTotal iobTotal = IobTotal.combine(bolusIob, basalIob).round();
         if (time < System.currentTimeMillis()) {
@@ -1205,7 +1267,7 @@ public class TuneProfile implements PluginBase {
 
     public  String result(int daysBack) throws IOException, ParseException {
 
-        tunedISF = 0;
+        int tunedISF = 0;
         double isfResult = 0;
         basalsResultInit();
         long now = System.currentTimeMillis();
@@ -1251,11 +1313,11 @@ public class TuneProfile implements PluginBase {
         }
         if(previousResult != null) {
             String previousAutotune = previousResult.optString("basalProfile");
-            log.debug("PrevResult full: "+previousResult.toString());
-            log.debug("PrevResult: "+previousAutotune.toString());
+//            log.debug("PrevResult full: "+previousResult.toString());
+//            log.debug("PrevResult: "+previousAutotune.toString());
             previousAutotune = previousAutotune.substring(0, previousAutotune.length() - 1);
             previousAutotune = previousAutotune.substring(1, previousAutotune.length());
-            log.debug("PrevResult after trim : "+previousAutotune.toString());
+//            log.debug("PrevResult after trim : "+previousAutotune.toString());
             List<String> basalProfile  = new ArrayList<String>(Arrays.asList(previousAutotune.split(", ")));
             List<Double> tunedProfile = new ArrayList<Double>();
             //Parsing last result
@@ -1288,7 +1350,7 @@ public class TuneProfile implements PluginBase {
             result += line;
             result += "|   CR   |    "+profile.getIc()+"    |    "+round(previousResult.optDouble("carb_ratio", 0d),3)+"     |\n";
             result += line;
-            result += "|  CSF  |    "+round(profile.getIsf()/profile.getIc(),3)+"    |    "+round(previousResult.optDouble("csf", 0d),3)+"     |\n";
+            result += "|  CSF  |    "+round(profile.getIsf()/profile.getIc(),3)+"    |    "+round(previousResult.optDouble("csf", 0d)/toMgDl,3)+"     |\n";
             result += line;
             //
             return result;
