@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -1270,18 +1271,15 @@ public class TuneProfile implements PluginBase {
             for (int i = 0; i < 24; i++) {
                 if(tunedProfile.size() < i || tunedProfile.size() == 0)
                     return "Error at index "+i+" or empty basalprofile<List>";
-                String basalString = ""+round(getBasal(i),3);
-                while(basalString.length()<7){
-                    basalString = basalString + " ";
-                }
-                String tunedString = ""+round(tunedProfile.get(i),3);
-                while(tunedString.length()<10){
-                    tunedString = tunedString + " ";
-                }
+                DecimalFormat df = new DecimalFormat("0.000");
+                String basalString = df.format(getBasal(i));
+
+                String tunedString = df.format(tunedProfile.get(i));
+
                 String hourString = ""+i;
                 if(i<10)
-                    hourString = i+"   ";
-                result += "|   " + hourString + "    | " + basalString + " | " +tunedString+" |\n";
+                    hourString = i+"  ";
+                result += "|   " + hourString + "    |  " + basalString + "  |    " +tunedString+"    |\n";
 
             }
             result += line;
