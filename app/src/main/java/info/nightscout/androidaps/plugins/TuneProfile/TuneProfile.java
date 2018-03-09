@@ -17,7 +17,6 @@ import info.nightscout.androidaps.db.TemporaryBasal;
 import info.nightscout.androidaps.db.Treatment;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensResult;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.utils.Round;
 import info.nightscout.utils.SP;
@@ -43,12 +42,10 @@ import java.util.List;
 
 /**
  * Created by Rumen Georgiev on 1/29/2018.
- ideia is to port Autotune from OpenAPS to java
+ idea is to port Autotune from OpenAPS to java
  let's start by taking 1 day of data from NS, and comparing it to ideal BG
  TODO: Sort glucoseData like autotune-prep does categorize.js
- TODO:
  TODO: Get treatments
- TODO: Add class BGDatum for compatibility with Categorize
  START_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  END_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  EXPORT_EXCEL="" # Default is to not export to Microsoft Excel

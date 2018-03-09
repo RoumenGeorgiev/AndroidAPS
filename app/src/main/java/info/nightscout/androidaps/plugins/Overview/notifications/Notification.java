@@ -202,7 +202,7 @@ public class Notification {
         Double threshold = NSSettingsStatus.getInstance().getThreshold("alarmTimeagoWarnMins");
 	//log.debug("OpenAPS Alerts enabled: "+openAPSEnabledAlerts);
 	// if no thresshold from Ns get it loccally
-        if(threshold == null) threshold = SP.getDouble(R.string.key_nsalarm_staledatavalue,15D);
+        if(threshold == null) threshold = SP.getDouble("nsalarm_staledatavalue",15D);
 	// No threshold of OpenAPS Alarm so using the one for BG 
 	// Added OpenAPSEnabledAlerts to alarm check
         if((bgReadingAgoMin > threshold && SP.getBoolean(R.string.key_nsalarm_staledata, false))||(bgReadingAgoMin > threshold && openAPSEnabledAlerts)){
