@@ -140,7 +140,7 @@ public class MainApp extends Application {
             if (Config.DANAR) pluginsList.add(DanaRv2Plugin.getPlugin());
             if (Config.DANAR) pluginsList.add(DanaRSPlugin.getPlugin());
             pluginsList.add(CareportalPlugin.getPlugin());
-            if (Config.DANAR) pluginsList.add(InsightPumpPlugin.getPlugin());
+            // if (Config.DANAR) pluginsList.add(InsightPumpPlugin.getPlugin()); // <-- Enable Insight plugin here
             if (Config.MDI) pluginsList.add(MDIPlugin.getPlugin());
             if (Config.VIRTUALPUMP) pluginsList.add(VirtualPumpPlugin.getPlugin());
             if (Config.APS) pluginsList.add(LoopPlugin.getPlugin());
@@ -247,6 +247,10 @@ public class MainApp extends Application {
 
     public static String gs(int id, Object... args) {
         return sResources.getString(id, args);
+    }
+
+    public static int gc(int id) {
+        return sResources.getColor(id);
     }
 
     public static MainApp instance() {

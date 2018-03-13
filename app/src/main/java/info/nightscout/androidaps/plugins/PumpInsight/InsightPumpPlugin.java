@@ -1,6 +1,9 @@
 package info.nightscout.androidaps.plugins.PumpInsight;
 
 import android.os.Handler;
+import android.util.Log;
+
+import com.j256.ormlite.stmt.query.In;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -23,17 +26,21 @@ import info.nightscout.androidaps.data.PumpEnactResult;
 import info.nightscout.androidaps.db.ExtendedBolus;
 import info.nightscout.androidaps.db.Source;
 import info.nightscout.androidaps.db.TemporaryBasal;
+import info.nightscout.androidaps.db.Treatment;
 import info.nightscout.androidaps.interfaces.ConstraintsInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PumpDescription;
 import info.nightscout.androidaps.interfaces.PumpInterface;
+import info.nightscout.androidaps.plugins.Overview.events.EventDismissBolusprogressIfRunning;
+import info.nightscout.androidaps.plugins.Overview.events.EventDismissNotification;
 import info.nightscout.androidaps.plugins.Overview.events.EventNewNotification;
 import info.nightscout.androidaps.plugins.Overview.events.EventOverviewBolusProgress;
 import info.nightscout.androidaps.plugins.Overview.notifications.Notification;
-import info.nightscout.androidaps.plugins.PumpInsight.connector.AbsoluteTBRTaskRunner;
 import info.nightscout.androidaps.plugins.PumpInsight.connector.CancelBolusTaskRunner;
 import info.nightscout.androidaps.plugins.PumpInsight.connector.Connector;
 import info.nightscout.androidaps.plugins.PumpInsight.connector.SetTBRTaskRunner;
+import info.nightscout.androidaps.plugins.PumpInsight.connector.StatusTaskRunner;
+import info.nightscout.androidaps.plugins.PumpInsight.connector.WriteBasalProfileTaskRunner;
 import info.nightscout.androidaps.plugins.PumpInsight.events.EventInsightPumpCallback;
 import info.nightscout.androidaps.plugins.PumpInsight.events.EventInsightPumpUpdateGui;
 import info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver;
@@ -46,17 +53,19 @@ import info.nightscout.utils.SP;
 import sugar.free.sightparser.applayer.descriptors.ActiveBolus;
 import sugar.free.sightparser.applayer.descriptors.ActiveBolusType;
 import sugar.free.sightparser.applayer.descriptors.PumpStatus;
+import sugar.free.sightparser.applayer.descriptors.configuration_blocks.BRProfileBlock;
 import sugar.free.sightparser.applayer.messages.AppLayerMessage;
 import sugar.free.sightparser.applayer.messages.remote_control.BolusMessage;
+import sugar.free.sightparser.applayer.messages.remote_control.CancelBolusMessage;
 import sugar.free.sightparser.applayer.messages.remote_control.CancelTBRMessage;
 import sugar.free.sightparser.applayer.messages.remote_control.ExtendedBolusMessage;
 import sugar.free.sightparser.applayer.messages.remote_control.StandardBolusMessage;
+import sugar.free.sightparser.applayer.messages.status.ActiveBolusesMessage;
 import sugar.free.sightparser.handling.SingleMessageTaskRunner;
 import sugar.free.sightparser.handling.TaskRunner;
-import sugar.free.sightparser.handling.taskrunners.StatusTaskRunner;
+import sugar.free.sightparser.pipeline.Status;
 
 import static info.nightscout.androidaps.plugins.PumpInsight.history.PumpIdCache.getRecordUniqueID;
-import static info.nightscout.androidaps.plugins.PumpInsight.utils.Helpers.roundDouble;
 
 
 /**
@@ -80,12 +89,10 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
     private static volatile boolean update_pending = false;
     private static Logger log = LoggerFactory.getLogger(InsightPumpPlugin.class);
     private static volatile InsightPumpPlugin plugin;
-    private final Handler handler = new Handler();
     private final InsightPumpAsyncAdapter async = new InsightPumpAsyncAdapter();
-    private StatusTaskRunner.StatusResult statusResult;
+    private StatusTaskRunner.Result statusResult;
     private long statusResultTime = -1;
     private Date lastDataTime = new Date(0);
-    private TaskRunner taskRunner;
     private boolean fragmentEnabled = false;
     private boolean fragmentVisible = false;
     private boolean fauxTBRcancel = true;
@@ -93,32 +100,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
     private double basalRate = 0;
     private Connector connector;
     private volatile boolean connector_enabled = false;
-    private final TaskRunner.ResultCallback statusResultHandler = new TaskRunner.ResultCallback() {
-
-        @Override
-        public void onError(Exception e) {
-            log("Got error taskrunner: " + e);
-            android.util.Log.e("INSIGHTPUMP", "taskrunner stacktrace: ", e);
-
-            if (e instanceof sugar.free.sightparser.error.DisconnectedError) {
-                if (Helpers.ratelimit("insight-reconnect", 2)) {
-                    Connector.connectToPump();
-                    updateGui();
-                }
-            }
-        }
-
-        @Override
-        public synchronized void onResult(Object result) {
-            log("GOT STATUS RESULT!!!");
-            statusResult = (StatusTaskRunner.StatusResult) result;
-            statusResultTime = Helpers.tsl();
-            processStatusResult();
-            updateGui();
-            connector.requestHistoryReSync();
-            connector.requestHistorySync();
-        }
-    };
+    private List<BRProfileBlock.ProfileBlock> profileBlocks;
 
     private InsightPumpPlugin() {
         log("InsightPumpPlugin instantiated");
@@ -138,15 +120,18 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
         pumpDescription.tempPercentStep = 10;
 
         pumpDescription.tempDurationStep = 15; // 15 minutes up to 24 hours
+        pumpDescription.tempDurationStep15mAllowed = true;
+        pumpDescription.tempDurationStep30mAllowed = true;
         pumpDescription.tempMaxDuration = 24 * 60;
 
-        pumpDescription.isSetBasalProfileCapable = false; // leave this for now
+        pumpDescription.isSetBasalProfileCapable = true;
+        pumpDescription.is30minBasalRatesCapable = true;
         pumpDescription.basalStep = 0.01d;
         pumpDescription.basalMinimumRate = 0.02d;
 
         pumpDescription.isRefillingCapable = true;
-        //pumpDescription.storesCarbInfo = false;
 
+        pumpDescription.storesCarbInfo = false;
     }
 
 
@@ -371,34 +356,81 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
         lastDataTime = new Date();
         if (Connector.get().isPumpConnected()) {
             log("is connected.. requesting status");
-            handler.postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        taskRunner = new StatusTaskRunner(connector.getServiceConnector());
-                                        taskRunner.fetch(statusResultHandler);
-                                    }
-                                }
-                    , 1000);
+            final UUID uuid = aSyncTaskRunner(new StatusTaskRunner(connector.getServiceConnector()), "Status");
+            Mstatus mstatus = async.busyWaitForCommandResult(uuid, BUSY_WAIT_TIME);
+            if (mstatus.success()) {
+                log("GOT STATUS RESULT!!! PARTY WOOHOO!!!");
+                statusResult = (StatusTaskRunner.Result) mstatus.getResponseObject();
+                statusResultTime = Helpers.tsl();
+                processStatusResult();
+                updateGui();
+                connector.requestHistoryReSync();
+                connector.requestHistorySync();
+            } else {
+                log("StatusTaskRunner wasn't successful.");
+                if (connector.getServiceConnector().isConnectedToService() && connector.getServiceConnector().getStatus() != Status.CONNECTED) {
+                    if (Helpers.ratelimit("insight-reconnect", 2)) {
+                        Connector.connectToPump();
+                        updateGui();
+                    }
+                }
+            }
         } else {
             log("not connected.. not requesting status");
         }
     }
 
-    // TODO implement
     @Override
     public PumpEnactResult setNewBasalProfile(Profile profile) {
-        lastDataTime = new Date();
-        // Do nothing here. we are using MainApp.getConfigBuilder().getActiveProfile().getProfile();
         PumpEnactResult result = new PumpEnactResult();
-        result.enacted = false;
-        result.success = false;
-        Notification notification = new Notification(Notification.PROFILE_SET_OK, MainApp.sResources.getString(R.string.profile_set_ok), Notification.INFO, 60);
-        MainApp.bus().post(new EventNewNotification(notification));
+        if (!isInitialized()) {
+            log.error("setNewBasalProfile not initialized");
+            Notification notification = new Notification(Notification.PROFILE_NOT_SET_NOT_INITIALIZED, MainApp.sResources.getString(R.string.pumpNotInitializedProfileNotSet), Notification.URGENT);
+            MainApp.bus().post(new EventNewNotification(notification));
+            result.comment = MainApp.sResources.getString(R.string.pumpNotInitializedProfileNotSet);
+            return result;
+        }
+        MainApp.bus().post(new EventDismissNotification(Notification.PROFILE_NOT_SET_NOT_INITIALIZED));
+        List<BRProfileBlock.ProfileBlock> profileBlocks = new ArrayList<>();
+        for (int i = 0; i < profile.getBasalValues().length; i++) {
+            Profile.BasalValue basalValue = profile.getBasalValues()[i];
+            Profile.BasalValue nextValue = null;
+            if (profile.getBasalValues().length > i + 1) nextValue = profile.getBasalValues()[i + 1];
+            profileBlocks.add(new BRProfileBlock.ProfileBlock((((nextValue != null ? nextValue.timeAsSeconds : 24 * 60 * 60) - basalValue.timeAsSeconds) / 60), Helpers.roundDouble(basalValue.value, 2)));
+            log("setNewBasalProfile: " + basalValue.value + " for " + Integer.toString(((nextValue != null ? nextValue.timeAsSeconds : 24 * 60 * 60) - basalValue.timeAsSeconds) / 60));
+        }
+        final UUID uuid = aSyncTaskRunner(new WriteBasalProfileTaskRunner(connector.getServiceConnector(), profileBlocks), "Write basal profile");
+        final Mstatus ms = async.busyWaitForCommandResult(uuid, BUSY_WAIT_TIME);
+        if (ms.success()) {
+            MainApp.bus().post(new EventDismissNotification(Notification.FAILED_UDPATE_PROFILE));
+            Notification notification = new Notification(Notification.PROFILE_SET_OK, MainApp.sResources.getString(R.string.profile_set_ok), Notification.INFO, 60);
+            MainApp.bus().post(new EventNewNotification(notification));
+            result.success = true;
+            result.enacted = true;
+            result.comment = "OK";
+        } else {
+            Notification notification = new Notification(Notification.FAILED_UDPATE_PROFILE, MainApp.sResources.getString(R.string.failedupdatebasalprofile), Notification.URGENT);
+            MainApp.bus().post(new EventNewNotification(notification));
+            result.comment = MainApp.sResources.getString(R.string.failedupdatebasalprofile);
+        }
         return result;
     }
 
     @Override
     public boolean isThisProfileSet(Profile profile) {
+        if (!isInitialized() || profileBlocks == null) return true;
+        if (profile.getBasalValues().length != profileBlocks.size()) return false;
+        for (int i = 0; i < profileBlocks.size(); i++) {
+            BRProfileBlock.ProfileBlock profileBlock = profileBlocks.get(i);
+            Profile.BasalValue basalValue = profile.getBasalValues()[i];
+            Profile.BasalValue nextValue = null;
+            if (profile.getBasalValues().length > i + 1) nextValue = profile.getBasalValues()[i + 1];
+            log("isThisProfileSet - Comparing block: Pump: " + profileBlock.getAmount() + " for " + profileBlock.getDuration()
+                    + " Profile: " + basalValue.value + " for " + Integer.toString(((nextValue != null ? nextValue.timeAsSeconds : 24 * 60 * 60) - basalValue.timeAsSeconds) / 60));
+            if (profileBlock.getDuration() * 60 != (nextValue != null ? nextValue.timeAsSeconds : 24 * 60 * 60) - basalValue.timeAsSeconds) return false;
+            //Allow a little imprecision due to rounding errors
+            if (Math.abs(profileBlock.getAmount() - Helpers.roundDouble(basalValue.value, 2)) >= 0.01D) return false;
+        }
         return true;
     }
 
@@ -427,9 +459,11 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
         result.percent = 100;
 
+        int bolusId = 0;
+
         // is there an insulin component to the treatment?
         if (detailedBolusInfo.insulin > 0) {
-            final UUID cmd = deliverBolus((float) detailedBolusInfo.insulin); // actually request delivery
+            final UUID cmd = deliverBolus(detailedBolusInfo.insulin); // actually request delivery
             if (cmd == null) {
                 return pumpEnactFailure();
             }
@@ -438,6 +472,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
             result.success = ms.success();
             if (ms.success()) {
                 detailedBolusInfo.pumpId = getRecordUniqueID(ms.getResponseID());
+                bolusId = ms.getResponseID();
             }
         } else {
             result.success = true; // always true with carb only treatments
@@ -446,9 +481,13 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
         if (result.success) {
             log("Success!");
 
+            Treatment t = new Treatment();
+            t.isSMB = detailedBolusInfo.isSMB;
             final EventOverviewBolusProgress bolusingEvent = EventOverviewBolusProgress.getInstance();
-            bolusingEvent.status = String.format(MainApp.sResources.getString(R.string.bolusdelivered), detailedBolusInfo.insulin);
-            bolusingEvent.percent = 100;
+            bolusingEvent.t = t;            
+            bolusingEvent.status = String.format(MainApp.sResources.getString(R.string.bolusdelivering), 0F);
+            bolusingEvent.bolusId = bolusId;
+            bolusingEvent.percent = 0;
             MainApp.bus().post(bolusingEvent);
             MainApp.getConfigBuilder().addToHistoryTreatment(detailedBolusInfo);
         } else {
@@ -463,12 +502,39 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
         lastDataTime = new Date();
         connector.requestHistorySync(30000);
+
+        if (result.success) while (true) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                break;
+            }
+            final UUID uuid = aSyncSingleCommand(new ActiveBolusesMessage(), "Active boluses");
+            Mstatus mstatus = async.busyWaitForCommandResult(uuid, BUSY_WAIT_TIME);
+            if (mstatus.success()) {
+                final EventOverviewBolusProgress bolusingEvent = EventOverviewBolusProgress.getInstance();
+                ActiveBolusesMessage activeBolusesMessage = (ActiveBolusesMessage) mstatus.getResponseObject();
+                ActiveBolus activeBolus = null;
+                if (activeBolusesMessage.getBolus1() != null && activeBolusesMessage.getBolus1().getBolusID() == bolusingEvent.bolusId) activeBolus = activeBolusesMessage.getBolus1();
+                else if (activeBolusesMessage.getBolus2() != null && activeBolusesMessage.getBolus2().getBolusID() == bolusingEvent.bolusId) activeBolus = activeBolusesMessage.getBolus2();
+                else if (activeBolusesMessage.getBolus3() != null && activeBolusesMessage.getBolus3().getBolusID() == bolusingEvent.bolusId) activeBolus = activeBolusesMessage.getBolus3();
+                if (activeBolus == null) break;
+                else {
+                    bolusingEvent.percent = (int) (100D / activeBolus.getInitialAmount() * (activeBolus.getInitialAmount() - activeBolus.getLeftoverAmount()));
+                    bolusingEvent.status = String.format(MainApp.sResources.getString(R.string.bolusdelivering), activeBolus.getInitialAmount() - activeBolus.getLeftoverAmount());
+                    MainApp.bus().post(bolusingEvent);
+                }
+            } else break;
+        }
         return result;
     }
 
     @Override
     public void stopBolusDelivering() {
-        final UUID cmd = aSyncTaskRunner(new CancelBolusTaskRunner(connector.getServiceConnector(), ActiveBolusType.STANDARD), "Cancel standard bolus");
+        CancelBolusMessage cancelBolusMessage = new CancelBolusMessage();
+        cancelBolusMessage.setBolusId(EventOverviewBolusProgress.getInstance().bolusId);
+        final UUID cmd = aSyncSingleCommand(cancelBolusMessage, "Cancel standard bolus");
 
         if (cmd == null) {
             return;
@@ -525,51 +591,6 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
             tempBasal.date = System.currentTimeMillis();
             tempBasal.isAbsolute = false;
             tempBasal.percentRate = percent_amount;
-            tempBasal.durationInMinutes = durationInMinutes;
-            tempBasal.source = Source.USER;
-            MainApp.getConfigBuilder().addToHistoryTempBasal(tempBasal);
-        }
-
-        if (Config.logPumpComm)
-            log.debug("Setting temp basal absolute: " + pumpEnactResult.success);
-
-        lastDataTime = new Date();
-
-        updateGui();
-
-        connector.requestHistorySync(5000);
-        connector.tryToGetPumpStatusAgain();
-
-        return pumpEnactResult;
-    }
-
-    //@Override
-    public PumpEnactResult setTempBasalAbsoluteOld(Double absoluteRate, Integer durationInMinutes, boolean enforceNew) {
-        absoluteRate = Helpers.roundDouble(absoluteRate, 3);
-        log("Set TBR absolute: " + absoluteRate);
-
-        final AbsoluteTBRTaskRunner task = new AbsoluteTBRTaskRunner(connector.getServiceConnector(), absoluteRate, durationInMinutes);
-        final UUID cmd = aSyncTaskRunner(task, "Set TBR abs: " + absoluteRate + " " + durationInMinutes + "m");
-
-        if (cmd == null) {
-            return pumpEnactFailure();
-        }
-
-        Mstatus ms = async.busyWaitForCommandResult(cmd, BUSY_WAIT_TIME);
-        log("Got command status: " + ms);
-
-        PumpEnactResult pumpEnactResult = new PumpEnactResult().enacted(true).isPercent(false).duration(durationInMinutes);
-        pumpEnactResult.absolute = absoluteRate; // TODO get converted value?
-        pumpEnactResult.success = ms.success();
-        pumpEnactResult.isTempCancel = false; // do we test this here?
-        pumpEnactResult.comment = ms.getCommandComment();
-
-        if (pumpEnactResult.success) {
-            // create log entry
-            final TemporaryBasal tempBasal = new TemporaryBasal();
-            tempBasal.date = System.currentTimeMillis();
-            tempBasal.isAbsolute = true;
-            tempBasal.absoluteRate = task.getCalculatedAbsolute(); // is this the correct figure to use?
             tempBasal.durationInMinutes = durationInMinutes;
             tempBasal.source = Source.USER;
             MainApp.getConfigBuilder().addToHistoryTempBasal(tempBasal);
@@ -684,8 +705,8 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
     public PumpEnactResult setExtendedBolus(Double insulin, Integer durationInMinutes) {
         log("Set Extended bolus " + insulin + " " + durationInMinutes);
         ExtendedBolusMessage extendedBolusMessage = new ExtendedBolusMessage();
-        extendedBolusMessage.setAmount((float) ((double) insulin));
-        extendedBolusMessage.setDuration((short) ((int) durationInMinutes));
+        extendedBolusMessage.setAmount(insulin);
+        extendedBolusMessage.setDuration(durationInMinutes);
         final UUID cmd = aSyncSingleCommand(extendedBolusMessage, "Extended bolus U" + insulin + " mins:" + durationInMinutes);
         if (cmd == null) {
             return pumpEnactFailure();
@@ -753,7 +774,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
     }
 
 
-    private synchronized UUID deliverBolus(float bolusValue) {
+    private synchronized UUID deliverBolus(double bolusValue) {
         log("DeliverBolus: " + bolusValue);
 
         if (bolusValue == 0) return null;
@@ -800,6 +821,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
                 extended.put("ExtendedBolusStart", DateUtil.dateAndTimeString(eb.date));
                 extended.put("ExtendedBolusRemaining", eb.getPlannedRemainingMinutes());
             }
+            extended.put("BaseBasalRate", getBaseBasalRate());
             status.put("timestamp", DateUtil.toISOString(new Date()));
 
             pump.put("battery", battery);
@@ -834,9 +856,10 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
     private void processStatusResult() {
         if (statusResult != null) {
-            batteryPercent = statusResult.getBatteryAmountMessage().getBatteryAmount();
-            reservoirInUnits = (int) statusResult.getCartridgeAmountMessage().getCartridgeAmount();
-            basalRate = roundDouble(statusResult.getCurrentBasalMessage().getCurrentBasalAmount(), 2);
+            batteryPercent = statusResult.battery;
+            reservoirInUnits = (int) statusResult.cartridge;
+            basalRate = statusResult.baseBasalRate;
+            profileBlocks = statusResult.basalProfile;
             initialized = true; // basic communication test
         }
     }
@@ -847,7 +870,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
     private boolean isPumpRunning() {
         if (statusResult == null) return true; // assume running if we have no information
-        return statusResult.getPumpStatusMessage().getPumpStatus() == PumpStatus.STARTED;
+        return statusResult.pumpStatus == PumpStatus.STARTED;
     }
 
     List<StatusItem> getStatusItems(boolean refresh) {
@@ -881,9 +904,9 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
                                     (StatusItem.Highlight.BAD) : StatusItem.Highlight.NOTICE) : StatusItem.Highlight.NORMAL) : StatusItem.Highlight.GOOD));
             l.add(new StatusItem(gs(R.string.pump_reservoir_label), reservoirInUnits + "U"));
             try {
-                if (statusResult.getCurrentTBRMessage().getPercentage() != 100) {
-                    l.add(new StatusItem(gs(R.string.insight_active_tbr), statusResult.getCurrentTBRMessage().getPercentage() + "% " + gs(R.string.with) + " "
-                            + Helpers.qs(statusResult.getCurrentTBRMessage().getLeftoverTime() - offset_minutes, 0)
+                if (statusResult.tbrAmount != 100) {
+                    l.add(new StatusItem(gs(R.string.insight_active_tbr), statusResult.tbrAmount + "% " + gs(R.string.with) + " "
+                            + Helpers.qs(statusResult.tbrLeftoverDuration - offset_minutes, 0)
                             + " " + gs(R.string.insight_min_left), StatusItem.Highlight.NOTICE));
                 }
             } catch (NullPointerException e) {
@@ -902,9 +925,9 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
         if (statusResult != null) {
             try {
-                statusActiveBolus(statusResult.getActiveBolusesMessage().getBolus1(), offset_minutes, l);
-                statusActiveBolus(statusResult.getActiveBolusesMessage().getBolus2(), offset_minutes, l);
-                statusActiveBolus(statusResult.getActiveBolusesMessage().getBolus3(), offset_minutes, l);
+                statusActiveBolus(statusResult.activeBolus1, offset_minutes, l);
+                statusActiveBolus(statusResult.activeBolus2, offset_minutes, l);
+                statusActiveBolus(statusResult.activeBolus3, offset_minutes, l);
             } catch (NullPointerException e) {
                 // getActiveBolusesMessage() may be null
             }
@@ -1087,7 +1110,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
     @Override
     public Double applyBasalConstraints(Double absoluteRate) {
-        return Math.min(absoluteRate, 25); // Maximum pump can support
+        return Math.min(absoluteRate, statusResult != null ? statusResult.maximumBasalAmount : 0);
     }
 
     @Override
@@ -1097,9 +1120,7 @@ public class InsightPumpPlugin implements PluginBase, PumpInterface, Constraints
 
     @Override
     public Double applyBolusConstraints(Double insulin) {
-        // TODO we could check what the current max is set on the pump and use that information here
-        // Pump can be reconfigured up to 50U max
-        return Math.min(insulin, 25);
+        return Math.min(insulin, statusResult != null ? statusResult.maximumBolusAmount : 0);
     }
 
     @Override

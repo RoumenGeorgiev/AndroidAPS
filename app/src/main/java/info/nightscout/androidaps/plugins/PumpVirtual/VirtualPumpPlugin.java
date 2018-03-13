@@ -89,6 +89,8 @@ public class VirtualPumpPlugin implements PluginBase, PumpInterface {
         pumpDescription.tempPercentStep = 10;
 
         pumpDescription.tempDurationStep = 30;
+        pumpDescription.tempDurationStep15mAllowed = true;
+        pumpDescription.tempDurationStep30mAllowed = true;
         pumpDescription.tempMaxDuration = 24 * 60;
 
 
@@ -99,6 +101,7 @@ public class VirtualPumpPlugin implements PluginBase, PumpInterface {
         pumpDescription.isRefillingCapable = false;
 
         pumpDescription.storesCarbInfo = false;
+        pumpDescription.is30minBasalRatesCapable = true;
     }
 
     @Override
