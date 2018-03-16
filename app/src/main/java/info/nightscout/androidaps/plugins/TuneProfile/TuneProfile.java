@@ -701,6 +701,15 @@ public class TuneProfile implements PluginBase {
                     // When BGI is negative and more than about 1/4 of basalBGI, we can use that data to tune ISF,
                     // unless avgDelta is positive: then that's some sort of unexplained rise we don't want to use for ISF, so that means basals
                     if (basalBGI > -4 * BGI) {
+                            // attempting to prevent basal from being calculated as negative; should help prevent basals from going below 0
+                            //var minPossibleDeviation = -( basalBGI + Math.max(0,BGI) );
+                            //var minPossibleDeviation = -basalBGI;
+                            //if ( deviation < minPossibleDeviation ) {
+                            //console.error("Adjusting deviation",deviation,"to",minPossibleDeviation.toFixed(2));
+                            //deviation = minPossibleDeviation;
+                            //deviation = deviation.toFixed(2);
+                            //glucoseDatum.deviation = deviation;
+                            //}
                         type="basal";
                         basalGlucoseData.add(glucoseDatum);
                     } else {
@@ -718,7 +727,7 @@ public class TuneProfile implements PluginBase {
             // debug line to print out all the things
 //            BGDateArray = BGDate.toString().split(" ");
 //            BGTime = BGDateArray[4];
-//            log.debug(absorbing+" mealCOB: "+mealCOB+" mealCarbs: "+mealCarbs+" basalBGI: "+round(basalBGI,1)+" BGI: "+BGI+" IOB: "+iob.iob+" at "+new Date(BGTime).toString()+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
+            log.debug(absorbing+" mealCOB: "+mealCOB+" mealCarbs: "+mealCarbs+" basalBGI: "+round(basalBGI,1)+" BGI: "+BGI+" IOB: "+iob.iob+" at "+new Date(BGTime).toString()+" dev: "+deviation+" avgDelta: "+avgDelta +" "+ type);
         }
 
         try {
