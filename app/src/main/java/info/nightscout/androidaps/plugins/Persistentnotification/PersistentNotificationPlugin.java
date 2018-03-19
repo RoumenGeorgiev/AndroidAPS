@@ -119,7 +119,7 @@ public class PersistentNotificationPlugin implements PluginBase {
 
         String line1 = ctx.getString(R.string.noprofile);
 
-        if (MainApp.getConfigBuilder().getActiveProfileInterface() == null || MainApp.getConfigBuilder().getProfile() == null)
+        if (MainApp.getConfigBuilder().getActiveProfileInterface() == null || !MainApp.getConfigBuilder().isProfileValid("Notificiation"))
             return;
         String units = MainApp.getConfigBuilder().getProfileUnits();
 
@@ -255,7 +255,8 @@ public class PersistentNotificationPlugin implements PluginBase {
 
     @Subscribe
     public void onStatusEvent(final EventNewBG ev) {
-        updateNotification();
+        if (ev.isFromActiveBgSource && ev.isNew && ev.isCurrent())
+            updateNotification();
     }
 
     @Subscribe

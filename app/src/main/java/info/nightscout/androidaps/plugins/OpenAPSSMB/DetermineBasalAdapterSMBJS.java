@@ -228,7 +228,7 @@ public class DetermineBasalAdapterSMBJS {
         mProfile.put("max_bg", maxBg);
         mProfile.put("target_bg", targetBg);
         mProfile.put("carb_ratio", profile.getIc());
-        mProfile.put("sens", Profile.toMgdl(profile.getIsf().doubleValue(), units));
+        mProfile.put("sens", Profile.toMgdl(profile.getIsf(), units));
         mProfile.put("max_daily_safety_multiplier", SP.getInt("openapsama_max_daily_safety_multiplier", 3));
         mProfile.put("current_basal_safety_multiplier", SP.getDouble("openapsama_current_basal_safety_multiplier", 4d));
 
@@ -264,10 +264,13 @@ public class DetermineBasalAdapterSMBJS {
         }
 
 
+        long now = System.currentTimeMillis();
+        TemporaryBasal tb = MainApp.getConfigBuilder().getTempBasalFromHistory(now);
+
         mCurrentTemp = new JSONObject();
         mCurrentTemp.put("temp", "absolute");
-        mCurrentTemp.put("duration", MainApp.getConfigBuilder().getTempBasalRemainingMinutesFromHistory());
-        mCurrentTemp.put("rate", MainApp.getConfigBuilder().getTempBasalAbsoluteRateHistory());
+        mCurrentTemp.put("duration", tb != null ? tb.getPlannedRemainingMinutes() : 0);
+        mCurrentTemp.put("rate", tb != null ? tb.tempBasalConvertedToAbsolute(now, profile) : 0d);
 
         // as we have non default temps longer than 30 mintues
         TemporaryBasal tempBasal = MainApp.getConfigBuilder().getTempBasalFromHistory(System.currentTimeMillis());

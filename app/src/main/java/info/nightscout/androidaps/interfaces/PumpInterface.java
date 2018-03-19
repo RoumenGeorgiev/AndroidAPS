@@ -5,8 +5,8 @@ import org.json.JSONObject;
 import java.util.Date;
 
 import info.nightscout.androidaps.data.DetailedBolusInfo;
-import info.nightscout.androidaps.data.PumpEnactResult;
 import info.nightscout.androidaps.data.Profile;
+import info.nightscout.androidaps.data.PumpEnactResult;
 
 /**
  * Created by mike on 04.06.2016.
@@ -44,7 +44,7 @@ public interface PumpInterface {
     PumpEnactResult cancelExtendedBolus();
 
     // Status to be passed to NS
-    JSONObject getJSONStatus();
+    JSONObject getJSONStatus(Profile profile, String profileName);
     String deviceID();
 
     // Pump capabilities

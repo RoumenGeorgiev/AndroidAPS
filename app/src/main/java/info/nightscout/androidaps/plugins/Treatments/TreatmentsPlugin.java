@@ -142,16 +142,18 @@ public class TreatmentsPlugin implements PluginBase, TreatmentsInterface {
     }
 
     private static void initializeTreatmentData() {
-        // Treatments
-        double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
+        double dia = Constants.defaultDIA;
+        if (MainApp.getConfigBuilder() != null && MainApp.getConfigBuilder().getProfile() != null)
+            dia = MainApp.getConfigBuilder().getProfile().getDia();
         long fromMills = (long) (System.currentTimeMillis() - 60 * 60 * 1000L * (24 + dia));
 
         treatments = MainApp.getDbHelper().getTreatmentDataFromTime(fromMills, false);
     }
 
     private static void initializeTempBasalData() {
-        // Treatments
-        double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
+         double dia = Constants.defaultDIA;
+        if (MainApp.getConfigBuilder() != null && MainApp.getConfigBuilder().getProfile() != null)
+            dia = MainApp.getConfigBuilder().getProfile().getDia();
         long fromMills = (long) (System.currentTimeMillis() - 60 * 60 * 1000L * (24 + dia));
 
         tempBasals.reset().add(MainApp.getDbHelper().getTemporaryBasalsDataFromTime(fromMills, false));
@@ -159,8 +161,9 @@ public class TreatmentsPlugin implements PluginBase, TreatmentsInterface {
     }
 
     private static void initializeExtendedBolusData() {
-        // Treatments
-        double dia = MainApp.getConfigBuilder() == null ? Constants.defaultDIA : MainApp.getConfigBuilder().getProfile().getDia();
+        double dia = Constants.defaultDIA;
+        if (MainApp.getConfigBuilder() != null && MainApp.getConfigBuilder().getProfile() != null)
+            dia = MainApp.getConfigBuilder().getProfile().getDia();
         long fromMills = (long) (System.currentTimeMillis() - 60 * 60 * 1000L * (24 + dia));
 
         extendedBoluses.reset().add(MainApp.getDbHelper().getExtendedBolusDataFromTime(fromMills, false));
@@ -346,7 +349,8 @@ public class TreatmentsPlugin implements PluginBase, TreatmentsInterface {
                 if (!t.isEndingEvent()) {
                     total.lastTempDate = t.date;
                     total.lastTempDuration = t.durationInMinutes;
-                    total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                    Profile profile = MainApp.getConfigBuilder().getProfile(t.date);
+                    total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date, profile);
                 }
 
             }
@@ -363,7 +367,8 @@ public class TreatmentsPlugin implements PluginBase, TreatmentsInterface {
                     if (!t.isEndingEvent() && t.date > total.lastTempDate) {
                         total.lastTempDate = t.date;
                         total.lastTempDuration = t.durationInMinutes;
-                        total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                        Profile profile = MainApp.getConfigBuilder().getProfile(t.date);
+                        total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date, profile);
                     }
                 }
             }
@@ -408,34 +413,6 @@ public class TreatmentsPlugin implements PluginBase, TreatmentsInterface {
     @Override
     public Intervals<ExtendedBolus> getExtendedBolusesFromHistory() {
         return extendedBoluses;
-    }
-
-    @Override
-    public double getTempBasalAbsoluteRateHistory() {
-        TemporaryBasal tb = getTempBasalFromHistory(System.currentTimeMillis());
-        if (tb != null) {
-            if (tb.isFakeExtended) {
-                double baseRate = ConfigBuilderPlugin.getActivePump().getBaseBasalRate();
-                double tempRate = baseRate + tb.netExtendedRate;
-                return tempRate;
-            } else if (tb.isAbsolute) {
-                return tb.absoluteRate;
-            } else {
-                double baseRate = ConfigBuilderPlugin.getActivePump().getBaseBasalRate();
-                double tempRate = baseRate * (tb.percentRate / 100d);
-                return tempRate;
-            }
-        }
-        return 0;
-    }
-
-    @Override
-    public double getTempBasalRemainingMinutesFromHistory() {
-        TemporaryBasal activeTemp = getTempBasalFromHistory(System.currentTimeMillis());
-        if (activeTemp != null) {
-            return activeTemp.getPlannedRemainingMinutes();
-        }
-        return 0;
     }
 
     @Override

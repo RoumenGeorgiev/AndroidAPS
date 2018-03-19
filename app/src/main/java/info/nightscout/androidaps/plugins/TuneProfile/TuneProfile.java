@@ -249,7 +249,7 @@ public class TuneProfile implements PluginBase {
                 if (!t.isEndingEvent()) {
                     total.lastTempDate = t.date;
                     total.lastTempDuration = t.durationInMinutes;
-                    total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                    total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date, profile);
                 }
 
             }
@@ -266,7 +266,7 @@ public class TuneProfile implements PluginBase {
                     if (!t.isEndingEvent() && t.date > total.lastTempDate) {
                         total.lastTempDate = t.date;
                         total.lastTempDuration = t.durationInMinutes;
-                        total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date);
+                        total.lastTempRate = t.tempBasalConvertedToAbsolute(t.date, profile);
                     }
                 }
             }
@@ -853,7 +853,7 @@ public class TuneProfile implements PluginBase {
         pumpCSF = CSF;
         // conditional on there being a pump profile; if not then skip
         if (pumpProfile != null) { pumpISFProfile = pumpProfile; }
-        if (pumpISFProfile != null && pumpISFProfile.getIsf() != null) {
+        if (pumpISFProfile != null && pumpISFProfile.getIsf() != 0d) {
             pumpISF = pumpISFProfile.getIsf()*toMgDl;
             pumpCarbRatio = pumpProfile.getIc();
             pumpCSF = pumpISF / pumpCarbRatio;

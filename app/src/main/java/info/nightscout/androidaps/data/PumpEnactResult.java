@@ -13,7 +13,7 @@ import info.nightscout.androidaps.R;
 import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.Round;
 
-public class PumpEnactResult extends Object {
+public class PumpEnactResult {
     private static Logger log = LoggerFactory.getLogger(PumpEnactResult.class);
 
     public boolean success = false;    // request was processed successfully (but possible no change was needed)
@@ -61,6 +61,7 @@ public class PumpEnactResult extends Object {
         this.percent = percent;
         return this;
     }
+
     public PumpEnactResult isPercent(boolean isPercent) {
         this.isPercent = isPercent;
         return this;
@@ -154,7 +155,7 @@ public class PumpEnactResult extends Object {
     public PumpEnactResult() {
     }
 
-    public JSONObject json() {
+    public JSONObject json(Profile profile) {
         JSONObject result = new JSONObject();
         try {
             if (bolusDelivered > 0) {
@@ -164,7 +165,7 @@ public class PumpEnactResult extends Object {
                 result.put("duration", 0);
             } else if (isPercent) {
                 // Nightscout is expecting absolute value
-                Double abs = Round.roundTo(MainApp.getConfigBuilder().getProfile().getBasal() * percent / 100, 0.01);
+                Double abs = Round.roundTo(profile.getBasal() * percent / 100, 0.01);
                 result.put("rate", abs);
                 result.put("duration", duration);
             } else {
