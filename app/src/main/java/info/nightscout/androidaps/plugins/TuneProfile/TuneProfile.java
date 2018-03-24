@@ -114,6 +114,11 @@ public class TuneProfile implements PluginBase {
     }
 
     @Override
+    public void setPluginEnabled(int type, boolean fragmentEnabled) {
+
+    }
+
+    @Override
     public boolean isVisibleInTabs(int type) {
         return type == GENERAL && fragmentVisible;
     }
@@ -133,7 +138,6 @@ public class TuneProfile implements PluginBase {
         return !Config.NSCLIENT && !Config.G5UPLOADER;
     }
 
-    @Override
     public void setFragmentEnabled(int type, boolean fragmentEnabled) {
         if (type == GENERAL) this.fragmentEnabled = fragmentEnabled;
     }

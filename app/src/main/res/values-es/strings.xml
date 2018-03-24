@@ -36,7 +36,7 @@
     <string name="treatments_wizard_bg_label">Glucosa</string>
     <string name="treatments_wizard_carbs_label">Hidratos Carbono</string>
     <string name="treatments_wizard_correction_label">Corrección</string>
-    <string name="treatments_wizard_unit_label">U</string>
+    <string name="insulin_unit_shortname">U</string>
     <string name="treatments_wizard_bolusiob_label">Bolo IOB</string>
     <string name="openapsma_run">Ejecutar ahora</string>
     <string name="vitualpump_label">BOMBA VIRTUAL</string>
@@ -78,7 +78,7 @@
     <string name="configbuilder_general">General</string>
     <string name="days">días</string>
     <string name="objectives_minimalduration">Duración mínima</string>
-    <string name="configbuilder_constraints">Restricciones</string>
+    <string name="constraints">Restricciones</string>
     <string name="loop">Lazo</string>
     <string name="configbuilder_loop">Lazo</string>
     <string name="loop_aps_label">APS</string>
