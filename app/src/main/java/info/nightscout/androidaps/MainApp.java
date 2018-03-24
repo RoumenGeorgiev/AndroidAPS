@@ -391,7 +391,9 @@ public class MainApp extends Application {
     }
 
     public static boolean isEngineeringModeOrRelease() {
-        return engineeringMode || devBranch;
+        if (!BuildConfig.APS)
+            return true;
+        return engineeringMode || !devBranch;
     }
 
     private String getLogDirectory() {
