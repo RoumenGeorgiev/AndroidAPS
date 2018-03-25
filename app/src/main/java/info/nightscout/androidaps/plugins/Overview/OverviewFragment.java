@@ -94,6 +94,7 @@ import info.nightscout.androidaps.plugins.Careportal.OptionsToShow;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.ConstraintsObjectives.ObjectivesPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensData;
+import info.nightscout.androidaps.plugins.IobCobCalculator.AutosensResult;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.events.EventAutosensCalculationFinished;
 import info.nightscout.androidaps.plugins.Loop.LoopPlugin;
@@ -1170,8 +1171,13 @@ public class OverviewFragment extends Fragment implements View.OnClickListener, 
             else
                 extendedBolusView.setVisibility(View.VISIBLE);
         }
-
-        activeProfileView.setText(MainApp.getConfigBuilder().getProfileName());
+        AutosensResult lastAutosensResult = null;
+        if (MainApp.getConstraintChecker().isAutosensModeEnabled().value()) {
+            lastAutosensResult = IobCobCalculatorPlugin.getPlugin().detectSensitivityWithLock(IobCobCalculatorPlugin.oldestDataAvailable(), System.currentTimeMillis());
+        } else {
+            lastAutosensResult = new AutosensResult();
+        }
+        activeProfileView.setText(MainApp.getConfigBuilder().getProfileName() + " * " + lastAutosensResult.ratio);
         activeProfileView.setBackgroundColor(Color.GRAY);
 
         tempTargetView.setOnLongClickListener(new View.OnLongClickListener() {
