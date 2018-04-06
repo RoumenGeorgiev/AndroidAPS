@@ -49,8 +49,7 @@ import java.util.List;
  * Created by Rumen Georgiev on 1/29/2018.
  idea is to port Autotune from OpenAPS to java
  let's start by taking 1 day of data from NS, and comparing it to ideal BG
- TODO: Sort glucoseData like autotune-prep does categorize.js
- TODO: Get treatments
+ TODO: Make this plugin disabable
  START_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  END_DAYS_AGO=1  # Default to yesterday if not otherwise specified
  EXPORT_EXCEL="" # Default is to not export to Microsoft Excel
@@ -71,8 +70,9 @@ import java.util.List;
 
 public class TuneProfile extends PluginBase {
 
-    private boolean fragmentEnabled = true;
-    private boolean fragmentVisible = true;
+    private boolean alwaysEnabled = false;
+    boolean fragmentVisible = true;
+    private boolean alwaysVisible = false;
 
     private static TuneProfile tuneProfile = null;
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
@@ -107,7 +107,8 @@ public class TuneProfile extends PluginBase {
         super(new PluginDescription()
                 .mainType(PluginType.GENERAL)
                 .fragmentClass(TuneProfileFragment.class.getName())
-                .visibleByDefault(true)
+                .alwayVisible(true)
+                .alwaysEnabled(false)
                 .pluginName(R.string.autotune)
                 .shortName(R.string.autotune_shortname)
         );
@@ -135,7 +136,7 @@ public class TuneProfile extends PluginBase {
 
 //    @Override
     public boolean isEnabled(PluginType type) {
-        return type == PluginType.GENERAL && fragmentEnabled;
+        return type == PluginType.GENERAL && true;
     }
 
 //    @Override
@@ -145,8 +146,8 @@ public class TuneProfile extends PluginBase {
 
 
 //    @Override
-    public boolean setFragmentVisible(PluginType type) {
-        return type == PluginType.GENERAL && fragmentVisible;
+    public boolean setFragmentVisible() {
+        return false;
     }
 
 //    @Override
@@ -164,13 +165,10 @@ public class TuneProfile extends PluginBase {
         return !Config.NSCLIENT && !Config.G5UPLOADER;
     }
 
-    public void setFragmentEnabled(PluginType type, boolean fragmentEnabled) {
-        if (type == PluginType.GENERAL) this.fragmentEnabled = fragmentEnabled;
-    }
 
-//    @Override
+    @Override
     public void setFragmentVisible(PluginType type, boolean fragmentVisible) {
-        if (type == PluginType.GENERAL) this.fragmentVisible = fragmentVisible;
+        this.fragmentVisible = true;
     }
 
     @Override

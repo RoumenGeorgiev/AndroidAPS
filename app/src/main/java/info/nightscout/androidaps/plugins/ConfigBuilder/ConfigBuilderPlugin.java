@@ -358,7 +358,6 @@ public class ConfigBuilderPlugin extends PluginBase {
     private <T> T determineActivePlugin(PluginType pluginType) {
         ArrayList<PluginBase> pluginsInCategory;
         pluginsInCategory = MainApp.getSpecificPluginsList(pluginType);
-
         return this.determineActivePlugin(pluginsInCategory, pluginType);
     }
 
