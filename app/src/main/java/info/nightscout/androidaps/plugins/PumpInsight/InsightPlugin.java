@@ -21,10 +21,12 @@ import info.nightscout.androidaps.data.PumpEnactResult;
 import info.nightscout.androidaps.db.ExtendedBolus;
 import info.nightscout.androidaps.db.Source;
 import info.nightscout.androidaps.db.TemporaryBasal;
-import info.nightscout.androidaps.db.Treatment;
+import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.interfaces.ConstraintsInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.interfaces.PluginDescription;
+import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.PumpDescription;
 import info.nightscout.androidaps.interfaces.PumpInterface;
 import info.nightscout.androidaps.plugins.Overview.events.EventDismissNotification;
@@ -42,6 +44,7 @@ import info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver;
 import info.nightscout.androidaps.plugins.PumpInsight.history.LiveHistory;
 import info.nightscout.androidaps.plugins.PumpInsight.utils.Helpers;
 import info.nightscout.androidaps.plugins.PumpInsight.utils.StatusItem;
+import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.NSUpload;
 import info.nightscout.utils.SP;
@@ -74,21 +77,27 @@ import static info.nightscout.androidaps.plugins.PumpInsight.history.PumpIdCache
  */
 
 @SuppressWarnings("AccessStaticViaInstance")
-public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInterface {
+public class InsightPlugin extends PluginBase implements PumpInterface, ConstraintsInterface {
+
+    private static volatile InsightPlugin plugin;
+
+    public static InsightPlugin getPlugin() {
+        if (plugin == null) {
+            plugin = new InsightPlugin();
+        }
+        return plugin;
+    }
 
     private static final long BUSY_WAIT_TIME = 20000;
-    static Integer batteryPercent = 0;
-    static Integer reservoirInUnits = 0;
-    static boolean initialized = false;
+    private static Integer batteryPercent = 0;
+    private static Integer reservoirInUnits = 0;
+    private static boolean initialized = false;
     private static volatile boolean update_pending = false;
     private static Logger log = LoggerFactory.getLogger(InsightPlugin.class);
-    private static volatile InsightPlugin plugin;
     private final InsightAsyncAdapter async = new InsightAsyncAdapter();
     private StatusTaskRunner.Result statusResult;
     private long statusResultTime = -1;
     private Date lastDataTime = new Date(0);
-    private boolean fragmentEnabled = false;
-    private boolean fragmentVisible = false;
     private boolean fauxTBRcancel = true;
     private PumpDescription pumpDescription = new PumpDescription();
     private double basalRate = 0;
@@ -97,6 +106,13 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
     private List<BRProfileBlock.ProfileBlock> profileBlocks;
 
     private InsightPlugin() {
+        super(new PluginDescription()
+                .mainType(PluginType.PUMP)
+                .fragmentClass(InsightFragment.class.getName())
+                .pluginName(R.string.insightpump)
+                .shortName(R.string.insightpump_shortname)
+                .preferencesId(R.xml.pref_insightpump)
+        );
         log("InsightPlugin instantiated");
         pumpDescription.isBolusCapable = true;
         pumpDescription.bolusStep = 0.05d; // specification says 0.05U up to 2U then 0.1U @ 2-5U  0.2U @ 10-20U 0.5U 10-20U (are these just UI restrictions?)
@@ -129,20 +145,6 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
     }
 
 
-    public static InsightPlugin getPlugin() {
-        if (plugin == null) {
-            createInstance();
-        }
-        return plugin;
-    }
-
-    private static synchronized void createInstance() {
-        if (plugin == null) {
-            log("creating instance");
-            plugin = new InsightPlugin();
-        }
-    }
-
     // just log during debugging
     private static void log(String msg) {
         android.util.Log.e("INSIGHTPUMP", msg);
@@ -157,7 +159,8 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
         MainApp.bus().post(e);
     }
 
-    private void enableConnector() {
+    @Override
+    protected void onStart() {
         if (!connector_enabled) {
             synchronized (this) {
                 if (!connector_enabled) {
@@ -168,9 +171,10 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
                 }
             }
         }
+        super.onStart();
     }
 
-    private void disableConnector() {
+    protected void onStop() {
         if (connector_enabled) {
             synchronized (this) {
                 if (connector_enabled) {
@@ -183,83 +187,15 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
     }
 
     @Override
-    public String getFragmentClass() {
-        return InsightFragment.class.getName();
-    }
-
-    @Override
-    public String getName() {
-        return MainApp.instance().getString(R.string.insightpump);
-    }
-
-    @Override
-    public String getNameShort() {
-        String name = MainApp.instance().getString(R.string.insightpump_shortname);
-        if (!name.trim().isEmpty()) {
-            //only if translation exists
-            return name;
-        }
-        // use long name as fallback
-        return getName();
-    }
-
-    @Override
-    public boolean isEnabled(int type) {
-        if (type == PluginBase.PUMP) return fragmentEnabled;
-        else if (type == PluginBase.CONSTRAINTS) return fragmentEnabled;
-        return false;
-    }
-
-    @Override
-    public boolean isVisibleInTabs(int type) {
-        return type == PUMP && fragmentVisible;
-    }
-
-    @Override
-    public boolean canBeHidden(int type) {
-        return true;
-    }
-
-    @Override
-    public boolean hasFragment() {
-        return true;
-    }
-
-    @Override
-    public boolean showInList(int type) {
-        return type == PUMP;
-    }
-
-    @Override
-    public void setPluginEnabled(int type, boolean fragmentEnabled) {
-        if (type == PUMP) {
-            if (fragmentEnabled) {
-                enableConnector();
-            } else {
-                disableConnector();
-            }
-            this.fragmentEnabled = fragmentEnabled;
-        }
-    }
-
-    @Override
-    public void setFragmentVisible(int type, boolean fragmentVisible) {
-        if (type == PUMP) this.fragmentVisible = fragmentVisible;
-    }
-
-    @Override
-    public int getPreferencesId() {
-        return R.xml.pref_insightpump;
-    }
-
-    @Override
-    public int getType() {
-        return PluginBase.PUMP;
-    }
-
-    @Override
     public boolean isFakingTempsByExtendedBoluses() {
         return false;
+    }
+
+    @Override
+    public PumpEnactResult loadTDDs() {
+        //TODO: read TDDs and store to DB
+        PumpEnactResult result = new PumpEnactResult();
+        return result;
     }
 
     @Override
@@ -492,7 +428,7 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
             bolusingEvent.bolusId = bolusId;
             bolusingEvent.percent = 0;
             MainApp.bus().post(bolusingEvent);
-            MainApp.getConfigBuilder().addToHistoryTreatment(detailedBolusInfo);
+            TreatmentsPlugin.getPlugin().addToHistoryTreatment(detailedBolusInfo);
         } else {
             log.debug("Failure to deliver treatment");
         }
@@ -586,19 +522,17 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
         PumpEnactResult pumpEnactResult = new PumpEnactResult().enacted(true).isPercent(true).duration(durationInMinutes);
         pumpEnactResult.percent = percent_amount;
         pumpEnactResult.success = ms.success();
-        pumpEnactResult.isTempCancel = percent_amount == 100; // 100% temp basal is a cancellation
         pumpEnactResult.comment = ms.getCommandComment();
 
 
         if (pumpEnactResult.success) {
             // create log entry
-            final TemporaryBasal tempBasal = new TemporaryBasal();
-            tempBasal.date = System.currentTimeMillis();
-            tempBasal.isAbsolute = false;
-            tempBasal.percentRate = percent_amount;
-            tempBasal.durationInMinutes = durationInMinutes;
-            tempBasal.source = Source.USER;
-            MainApp.getConfigBuilder().addToHistoryTempBasal(tempBasal);
+            final TemporaryBasal tempBasal = new TemporaryBasal()
+                    .date(System.currentTimeMillis())
+                    .percent(percent_amount)
+                    .duration(durationInMinutes)
+                    .source(Source.USER);
+            TreatmentsPlugin.getPlugin().addToHistoryTempBasal(tempBasal);
         }
 
         if (Config.logPumpComm)
@@ -638,18 +572,16 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
         PumpEnactResult pumpEnactResult = new PumpEnactResult().enacted(true).isPercent(true).duration(durationInMinutes);
         pumpEnactResult.percent = percent;
         pumpEnactResult.success = ms.success();
-        pumpEnactResult.isTempCancel = percent == 100; // 100% temp basal is a cancellation
         pumpEnactResult.comment = ms.getCommandComment();
 
         if (pumpEnactResult.success) {
             // create log entry
-            final TemporaryBasal tempBasal = new TemporaryBasal();
-            tempBasal.date = System.currentTimeMillis();
-            tempBasal.isAbsolute = false;
-            tempBasal.percentRate = percent;
-            tempBasal.durationInMinutes = durationInMinutes;
-            tempBasal.source = Source.USER; // TODO check this is correct
-            MainApp.getConfigBuilder().addToHistoryTempBasal(tempBasal);
+            final TemporaryBasal tempBasal = new TemporaryBasal()
+                    .date(System.currentTimeMillis())
+                    .percent(percent)
+                    .duration(durationInMinutes)
+                    .source(Source.USER); // TODO check this is correct
+            TreatmentsPlugin.getPlugin().addToHistoryTempBasal(tempBasal);
         }
 
         updateGui();
@@ -683,14 +615,11 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
         }
 
         // TODO isn't conditional on one apparently being in progress only the history change
-        boolean enacted = false;
         final Mstatus ms = async.busyWaitForCommandResult(cmd, BUSY_WAIT_TIME);
 
-        if (MainApp.getConfigBuilder().isTempBasalInProgress()) {
-            enacted = true;
-            TemporaryBasal tempStop = new TemporaryBasal(System.currentTimeMillis());
-            tempStop.source = Source.USER;
-            MainApp.getConfigBuilder().addToHistoryTempBasal(tempStop);
+        if (TreatmentsPlugin.getPlugin().isTempBasalInProgress()) {
+            TemporaryBasal tempStop = new TemporaryBasal().date(System.currentTimeMillis()).source(Source.USER);
+            TreatmentsPlugin.getPlugin().addToHistoryTempBasal(tempStop);
         }
         lastDataTime = new Date();
         updateGui();
@@ -732,7 +661,7 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
             extendedBolus.durationInMinutes = durationInMinutes;
             extendedBolus.source = Source.USER;
             extendedBolus.pumpId = getRecordUniqueID(ms.getResponseID());
-            MainApp.getConfigBuilder().addToHistoryExtendedBolus(extendedBolus);
+            TreatmentsPlugin.getPlugin().addToHistoryExtendedBolus(extendedBolus);
         }
 
         if (Config.logPumpComm)
@@ -761,10 +690,10 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
 
         final Mstatus ms = async.busyWaitForCommandResult(cmd, BUSY_WAIT_TIME);
 
-        if (MainApp.getConfigBuilder().isInHistoryExtendedBoluslInProgress()) {
+        if (TreatmentsPlugin.getPlugin().isInHistoryExtendedBoluslInProgress()) {
             ExtendedBolus exStop = new ExtendedBolus(System.currentTimeMillis());
             exStop.source = Source.USER;
-            MainApp.getConfigBuilder().addToHistoryExtendedBolus(exStop);
+            TreatmentsPlugin.getPlugin().addToHistoryExtendedBolus(exStop);
         }
 
         if (Config.logPumpComm)
@@ -814,13 +743,13 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
                 extended.put("ActiveProfile", MainApp.getConfigBuilder().getProfileName());
             } catch (Exception e) {
             }
-            TemporaryBasal tb = MainApp.getConfigBuilder().getTempBasalFromHistory(now);
+            TemporaryBasal tb = TreatmentsPlugin.getPlugin().getTempBasalFromHistory(now);
             if (tb != null) {
                 extended.put("TempBasalAbsoluteRate", tb.tempBasalConvertedToAbsolute(now, profile));
                 extended.put("TempBasalStart", DateUtil.dateAndTimeString(tb.date));
                 extended.put("TempBasalRemaining", tb.getPlannedRemainingMinutes());
             }
-            ExtendedBolus eb = MainApp.getConfigBuilder().getExtendedBolusFromHistory(now);
+            ExtendedBolus eb = TreatmentsPlugin.getPlugin().getExtendedBolusFromHistory(now);
             if (eb != null) {
                 extended.put("ExtendedBolusAbsoluteRate", eb.absoluteRate());
                 extended.put("ExtendedBolusStart", DateUtil.dateAndTimeString(eb.date));
@@ -920,9 +849,9 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
 
         }
 
-        if (MainApp.getConfigBuilder().isTempBasalInProgress()) {
+        if (TreatmentsPlugin.getPlugin().isTempBasalInProgress()) {
             try {
-                l.add(new StatusItem(gs(R.string.pump_tempbasal_label), MainApp.getConfigBuilder().getTempBasalFromHistory(System.currentTimeMillis()).toStringFull()));
+                l.add(new StatusItem(gs(R.string.pump_tempbasal_label), TreatmentsPlugin.getPlugin().getTempBasalFromHistory(System.currentTimeMillis()).toStringFull()));
             } catch (NullPointerException e) {
                 //
             }
@@ -938,10 +867,10 @@ public class InsightPlugin implements PluginBase, PumpInterface, ConstraintsInte
             }
         }
 
-        if (MainApp.getConfigBuilder().isInHistoryExtendedBoluslInProgress()) {
+        if (TreatmentsPlugin.getPlugin().isInHistoryExtendedBoluslInProgress()) {
             try {
 
-                l.add(new StatusItem(gs(R.string.virtualpump_extendedbolus_label), MainApp.getConfigBuilder().getExtendedBolusFromHistory(System.currentTimeMillis()).toString()));
+                l.add(new StatusItem(gs(R.string.virtualpump_extendedbolus_label), TreatmentsPlugin.getPlugin().getExtendedBolusFromHistory(System.currentTimeMillis()).toString()));
             } catch (NullPointerException e) {
                 //
             }

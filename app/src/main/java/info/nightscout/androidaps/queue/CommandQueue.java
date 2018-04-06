@@ -33,6 +33,7 @@ import info.nightscout.androidaps.queue.commands.CommandCancelTempBasal;
 import info.nightscout.androidaps.queue.commands.CommandExtendedBolus;
 import info.nightscout.androidaps.queue.commands.CommandLoadEvents;
 import info.nightscout.androidaps.queue.commands.CommandLoadHistory;
+import info.nightscout.androidaps.queue.commands.CommandLoadTDDs;
 import info.nightscout.androidaps.queue.commands.CommandReadStatus;
 import info.nightscout.androidaps.queue.commands.CommandSMBBolus;
 import info.nightscout.androidaps.queue.commands.CommandSetProfile;
@@ -83,7 +84,7 @@ public class CommandQueue {
         return new PumpEnactResult().success(false).enacted(false).comment(MainApp.sResources.getString(R.string.executingrightnow));
     }
 
-    private boolean isRunning(Command.CommandType type) {
+    public boolean isRunning(Command.CommandType type) {
         if (performing != null && performing.commandType == type)
             return true;
         return false;
@@ -106,10 +107,12 @@ public class CommandQueue {
 
     private synchronized void inject(Command command) {
         // inject as a first command
+        log.debug("QUEUE: Adding as first: " + command.getClass().getSimpleName() + " - " + command.status());
         queue.addFirst(command);
     }
 
     private synchronized void add(Command command) {
+        log.debug("QUEUE: Adding: " + command.getClass().getSimpleName() + " - " + command.status());
         queue.add(command);
     }
 
@@ -141,9 +144,16 @@ public class CommandQueue {
     // After new command added to the queue
     // start thread again if not already running
     protected synchronized void notifyAboutNewCommand() {
+        while (thread != null && thread.getState() != Thread.State.TERMINATED && thread.waitingForDisconnect) {
+            log.debug("QUEUE: Waiting for previous thread finish");
+            SystemClock.sleep(500);
+        }
         if (thread == null || thread.getState() == Thread.State.TERMINATED) {
             thread = new QueueThread(this);
             thread.start();
+            log.debug("QUEUE: Starting new thread");
+        } else {
+            log.debug("QUEUE: Thread is already running");
         }
     }
 
@@ -289,25 +299,11 @@ public class CommandQueue {
 
     // returns true if command is queued
     public boolean setProfile(Profile profile, Callback callback) {
-        if (isRunning(Command.CommandType.BASALPROFILE)) {
+        if (isThisProfileSet(profile)) {
+            log.debug("QUEUE: Correct profile already set");
             if (callback != null)
-                callback.result(executingNowError()).run();
+                callback.result(new PumpEnactResult().success(true).enacted(false)).run();
             return false;
-        }
-
-        // Check that there is a valid profileSwitch NOW
-        if (MainApp.getConfigBuilder().getProfileSwitchFromHistory(System.currentTimeMillis())==null) {
-            // wait for DatabaseHelper.scheduleProfiSwitch() to do the profile switch // TODO clean this crap up
-            SystemClock.sleep(5000);
-            if (MainApp.getConfigBuilder().getProfileSwitchFromHistory(System.currentTimeMillis())==null) {
-                Notification noProfileSwitchNotif = new Notification(Notification.PROFILE_SWITCH_MISSING, MainApp.gs(R.string.profileswitch_ismissing), Notification.NORMAL);
-                MainApp.bus().post(new EventNewNotification(noProfileSwitchNotif));
-                if (callback != null) {
-                    PumpEnactResult result = new PumpEnactResult().success(false).enacted(false).comment("Refuse to send profile to pump! No ProfileSwitch!");
-                    callback.result(result).run();
-                }
-                return false;
-            }
         }
 
         if (!MainApp.isEngineeringModeOrRelease()) {
@@ -333,13 +329,6 @@ public class CommandQueue {
         }
 
         MainApp.bus().post(new EventDismissNotification(Notification.BASAL_VALUE_BELOW_MINIMUM));
-
-        if (isThisProfileSet(profile)) {
-            log.debug("Correct profile already set");
-            if (callback != null)
-                callback.result(new PumpEnactResult().success(true).enacted(false)).run();
-            return false;
-        }
 
         // remove all unfinished
         removeAll(Command.CommandType.BASALPROFILE);
@@ -385,6 +374,25 @@ public class CommandQueue {
 
         // add new command to queue
         add(new CommandLoadHistory(type, callback));
+
+        notifyAboutNewCommand();
+
+        return true;
+    }
+
+    // returns true if command is queued
+    public boolean loadTDDs(Callback callback) {
+        if (isRunning(Command.CommandType.LOADHISTORY)) {
+            if (callback != null)
+                callback.result(executingNowError()).run();
+            return false;
+        }
+
+        // remove all unfinished
+        removeAll(Command.CommandType.LOADHISTORY);
+
+        // add new command to queue
+        add(new CommandLoadTDDs(callback));
 
         notifyAboutNewCommand();
 

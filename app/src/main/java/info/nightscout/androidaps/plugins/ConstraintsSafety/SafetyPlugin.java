@@ -1,18 +1,21 @@
 package info.nightscout.androidaps.plugins.ConstraintsSafety;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.ConstraintChecker;
 import info.nightscout.androidaps.data.Profile;
+import info.nightscout.androidaps.interfaces.BgSourceInterface;
 import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.interfaces.ConstraintsInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.interfaces.PluginDescription;
+import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSAMA.OpenAPSAMAPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSMA.OpenAPSMAPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSSMB.OpenAPSSMBPlugin;
+import info.nightscout.androidaps.plugins.Overview.events.EventNewNotification;
+import info.nightscout.androidaps.plugins.Overview.notifications.Notification;
 import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.HardLimits;
 import info.nightscout.utils.Round;
@@ -21,8 +24,7 @@ import info.nightscout.utils.SP;
 /**
  * Created by mike on 05.08.2016.
  */
-public class SafetyPlugin implements PluginBase, ConstraintsInterface {
-    private static Logger log = LoggerFactory.getLogger(SafetyPlugin.class);
+public class SafetyPlugin extends PluginBase implements ConstraintsInterface {
 
     static SafetyPlugin plugin = null;
 
@@ -32,64 +34,15 @@ public class SafetyPlugin implements PluginBase, ConstraintsInterface {
         return plugin;
     }
 
-    @Override
-    public String getFragmentClass() {
-        return null;
-    }
-
-    @Override
-    public int getType() {
-        return PluginBase.CONSTRAINTS;
-    }
-
-    @Override
-    public String getName() {
-        return MainApp.instance().getString(R.string.safety);
-    }
-
-    @Override
-    public String getNameShort() {
-        // use long name as fallback (no tabs)
-        return getName();
-    }
-
-    @Override
-    public boolean isEnabled(int type) {
-        return type == CONSTRAINTS;
-    }
-
-    @Override
-    public boolean isVisibleInTabs(int type) {
-        return false;
-    }
-
-    @Override
-    public boolean canBeHidden(int type) {
-        return true;
-    }
-
-    @Override
-    public boolean hasFragment() {
-        return false;
-    }
-
-    @Override
-    public boolean showInList(int type) {
-        return false;
-    }
-
-    @Override
-    public void setPluginEnabled(int type, boolean fragmentEnabled) {
-
-    }
-
-    @Override
-    public void setFragmentVisible(int type, boolean fragmentVisible) {
-    }
-
-    @Override
-    public int getPreferencesId() {
-        return R.xml.pref_safety;
+    public SafetyPlugin() {
+        super(new PluginDescription()
+                .mainType(PluginType.CONSTRAINTS)
+                .neverVisible(true)
+                .alwaysEnabled(true)
+                .showInList(false)
+                .pluginName(R.string.safety)
+                .preferencesId(R.xml.pref_safety)
+        );
     }
 
     /**
@@ -104,12 +57,18 @@ public class SafetyPlugin implements PluginBase, ConstraintsInterface {
 
     @Override
     public Constraint<Boolean> isClosedLoopAllowed(Constraint<Boolean> value) {
-        if (!MainApp.isEngineeringModeOrRelease())
-            value.set(false, MainApp.gs(R.string.closed_loop_disabled_on_dev_branch), this);
-
         String mode = SP.getString("aps_mode", "open");
         if (!mode.equals("closed"))
             value.set(false, MainApp.gs(R.string.closedmodedisabledinpreferences), this);
+
+        if (!MainApp.isEngineeringModeOrRelease()) {
+            if (value.value()) {
+                Notification n = new Notification(Notification.TOAST_ALARM, MainApp.gs(R.string.closed_loop_disabled_on_dev_branch), Notification.NORMAL);
+                MainApp.bus().post(new EventNewNotification(n));
+            }
+            value.set(false, MainApp.gs(R.string.closed_loop_disabled_on_dev_branch), this);
+        }
+
         return value;
     }
 
@@ -126,6 +85,21 @@ public class SafetyPlugin implements PluginBase, ConstraintsInterface {
         boolean enabled = SP.getBoolean(R.string.key_use_smb, false);
         if (!enabled)
             value.set(false, MainApp.gs(R.string.smbdisabledinpreferences), this);
+        ConstraintChecker constraintChecker = MainApp.getConstraintChecker();
+        Constraint<Boolean> closedLoop = constraintChecker.isClosedLoopAllowed();
+        if (!closedLoop.value())
+            value.set(false, MainApp.gs(R.string.smbnotallowedinopenloopmode), this);
+        return value;
+    }
+
+    @Override
+    public Constraint<Boolean> isAdvancedFilteringEnabled(Constraint<Boolean> value) {
+        BgSourceInterface bgSource = MainApp.getConfigBuilder().getActiveBgSource();
+
+        if (bgSource != null) {
+            if (!bgSource.advancedFilteringSupported())
+                value.set(false, MainApp.gs(R.string.smbalwaysdisabled), this);
+        }
         return value;
     }
 
@@ -198,11 +172,11 @@ public class SafetyPlugin implements PluginBase, ConstraintsInterface {
         double maxIobPref = SP.getDouble(R.string.key_openapsma_max_iob, 1.5d);
         maxIob.setIfSmaller(maxIobPref, String.format(MainApp.gs(R.string.limitingiob), maxIobPref, MainApp.gs(R.string.maxvalueinpreferences)), this);
 
-        if (OpenAPSMAPlugin.getPlugin().isEnabled(PluginBase.APS))
+        if (OpenAPSMAPlugin.getPlugin().isEnabled(PluginType.APS))
             maxIob.setIfSmaller(HardLimits.maxIobAMA(), String.format(MainApp.gs(R.string.limitingiob), HardLimits.maxIobAMA(), MainApp.gs(R.string.hardlimit)), this);
-        if (OpenAPSAMAPlugin.getPlugin().isEnabled(PluginBase.APS))
+        if (OpenAPSAMAPlugin.getPlugin().isEnabled(PluginType.APS))
             maxIob.setIfSmaller(HardLimits.maxIobAMA(), String.format(MainApp.gs(R.string.limitingiob), HardLimits.maxIobAMA(), MainApp.gs(R.string.hardlimit)), this);
-        if (OpenAPSSMBPlugin.getPlugin().isEnabled(PluginBase.APS))
+        if (OpenAPSSMBPlugin.getPlugin().isEnabled(PluginType.APS))
             maxIob.setIfSmaller(HardLimits.maxIobSMB(), String.format(MainApp.gs(R.string.limitingiob), HardLimits.maxIobSMB(), MainApp.gs(R.string.hardlimit)), this);
         return maxIob;
     }

@@ -20,7 +20,6 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
 
-import com.crashlytics.android.answers.Answers;
 import com.crashlytics.android.answers.CustomEvent;
 import com.google.common.base.Joiner;
 import com.wdullaer.materialdatetimepicker.date.DatePickerDialog;
@@ -30,7 +29,6 @@ import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.DecimalFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
@@ -46,8 +44,11 @@ import info.nightscout.androidaps.db.Source;
 import info.nightscout.androidaps.db.TempTarget;
 import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
+import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.androidaps.queue.Callback;
 import info.nightscout.utils.DateUtil;
+import info.nightscout.utils.DecimalFormatter;
+import info.nightscout.utils.FabricPrivacy;
 import info.nightscout.utils.NumberPicker;
 import info.nightscout.utils.SP;
 import info.nightscout.utils.SafeParse;
@@ -124,7 +125,7 @@ public class NewInsulinDialog extends DialogFragment implements OnClickListener,
 
         editInsulin = (NumberPicker) view.findViewById(R.id.treatments_newinsulin_amount);
 
-        editInsulin.setParams(0d, 0d, maxInsulin, ConfigBuilderPlugin.getActivePump().getPumpDescription().bolusStep, new DecimalFormat("0.00"), false, textWatcher);
+        editInsulin.setParams(0d, 0d, maxInsulin, ConfigBuilderPlugin.getActivePump().getPumpDescription().bolusStep, DecimalFormatter.pumpSupportedBolusFormat(), false, textWatcher);
 
         dateButton = (TextView) view.findViewById(R.id.newinsulin_eventdate);
         timeButton = (TextView) view.findViewById(R.id.newinsulin_eventtime);
@@ -160,7 +161,8 @@ public class NewInsulinDialog extends DialogFragment implements OnClickListener,
     }
 
     private String toSignedString(double value) {
-        return value > 0 ? "+" + value : String.valueOf(value);
+        String formatted = DecimalFormatter.toPumpSupportedBolus(value);
+        return value > 0 ? "+" + formatted : formatted;
     }
 
     @Override
@@ -279,13 +281,13 @@ public class NewInsulinDialog extends DialogFragment implements OnClickListener,
                     accepted = true;
 
                     if (startESMCheckbox.isChecked()) {
-                        TempTarget tempTarget = new TempTarget();
-                        tempTarget.date = System.currentTimeMillis();
-                        tempTarget.durationInMinutes = (int) ttDuration;
-                        tempTarget.reason = "Eating soon";
-                        tempTarget.source = Source.USER;
-                        tempTarget.low = (int) finalTT;
-                        tempTarget.high = (int) finalTT;
+                        TempTarget tempTarget = new TempTarget()
+                                .date(System.currentTimeMillis())
+                                .duration((int) ttDuration)
+                                .reason("Eating soon")
+                                .source(Source.USER)
+                                .low((int) finalTT)
+                                .high((int) finalTT);
                         MainApp.getDbHelper().createOrUpdate(tempTarget);
                     }
 
@@ -299,7 +301,7 @@ public class NewInsulinDialog extends DialogFragment implements OnClickListener,
                         detailedBolusInfo.date = eventTime.getTime();
                         detailedBolusInfo.eventType = CareportalEvent.CORRECTIONBOLUS;
                         detailedBolusInfo.insulin = finalInsulinAfterConstraints;
-                        MainApp.getConfigBuilder().addToHistoryTreatment(detailedBolusInfo);
+                        TreatmentsPlugin.getPlugin().addToHistoryTreatment(detailedBolusInfo);
                     } else {
                         DetailedBolusInfo detailedBolusInfo = new DetailedBolusInfo();
                         detailedBolusInfo.eventType = CareportalEvent.CORRECTIONBOLUS;
@@ -319,7 +321,7 @@ public class NewInsulinDialog extends DialogFragment implements OnClickListener,
                                 }
                             }
                         });
-                        Answers.getInstance().logCustom(new CustomEvent("Bolus"));
+                        FabricPrivacy.getInstance().logCustom(new CustomEvent("Bolus"));
                     }
                 }
             });

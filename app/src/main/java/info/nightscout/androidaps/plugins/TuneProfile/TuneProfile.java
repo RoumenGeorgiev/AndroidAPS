@@ -10,12 +10,17 @@ import info.nightscout.androidaps.data.Iob;
 import info.nightscout.androidaps.data.IobTotal;
 import info.nightscout.androidaps.data.NonOverlappingIntervals;
 import info.nightscout.androidaps.data.Profile;
+import info.nightscout.androidaps.interfaces.PluginDescription;
+import info.nightscout.androidaps.plugins.Careportal.CareportalFragment;
+import info.nightscout.androidaps.plugins.Careportal.CareportalPlugin;
+import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.androidaps.db.BGDatum;
 import info.nightscout.androidaps.db.BgReading;
 import info.nightscout.androidaps.db.ExtendedBolus;
 import info.nightscout.androidaps.db.TemporaryBasal;
-import info.nightscout.androidaps.db.Treatment;
+import info.nightscout.androidaps.db.CareportalEvent;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.utils.Round;
@@ -64,7 +69,7 @@ import java.util.List;
 
  */
 
-public class TuneProfile implements PluginBase {
+public class TuneProfile extends PluginBase {
 
     private boolean fragmentEnabled = true;
     private boolean fragmentVisible = true;
@@ -86,13 +91,33 @@ public class TuneProfile implements PluginBase {
     private static Intervals<ExtendedBolus> extendedBoluses = new NonOverlappingIntervals<>();
     private NSService nsService = new NSService();
 
-    public TuneProfile() throws IOException {
+//    public TuneProfile() throws IOException {
+//    }
+
+    static TuneProfile tuneProfilePlugin;
+
+    static public TuneProfile getPlugin() throws IOException{
+        if (tuneProfilePlugin == null) {
+            tuneProfilePlugin = new TuneProfile();
+        }
+        return tuneProfilePlugin;
     }
 
-    @Override
+    public TuneProfile() throws IOException {
+        super(new PluginDescription()
+                .mainType(PluginType.GENERAL)
+                .fragmentClass(TuneProfileFragment.class.getName())
+                .visibleByDefault(true)
+                .pluginName(R.string.autotune)
+                .shortName(R.string.autotune_shortname)
+        );
+    }
+
+//    @Override
     public String getFragmentClass() {
         return TuneProfileFragment.class.getName();
     }
+
 
     @Override
     public String getName() { return "TuneProfile"; }
@@ -108,22 +133,23 @@ public class TuneProfile implements PluginBase {
         return getName();
     }
 
-    @Override
-    public boolean isEnabled(int type) {
-        return type == GENERAL && fragmentEnabled;
+//    @Override
+    public boolean isEnabled(PluginType type) {
+        return type == PluginType.GENERAL && fragmentEnabled;
     }
 
-    @Override
+//    @Override
     public void setPluginEnabled(int type, boolean fragmentEnabled) {
 
     }
 
-    @Override
-    public boolean isVisibleInTabs(int type) {
-        return type == GENERAL && fragmentVisible;
+
+//    @Override
+    public boolean setFragmentVisible(PluginType type) {
+        return type == PluginType.GENERAL && fragmentVisible;
     }
 
-    @Override
+//    @Override
     public boolean canBeHidden(int type) {
         return true;
     }
@@ -133,18 +159,18 @@ public class TuneProfile implements PluginBase {
         return true;
     }
 
-    @Override
+//    @Override
     public boolean showInList(int type) {
         return !Config.NSCLIENT && !Config.G5UPLOADER;
     }
 
-    public void setFragmentEnabled(int type, boolean fragmentEnabled) {
-        if (type == GENERAL) this.fragmentEnabled = fragmentEnabled;
+    public void setFragmentEnabled(PluginType type, boolean fragmentEnabled) {
+        if (type == PluginType.GENERAL) this.fragmentEnabled = fragmentEnabled;
     }
 
-    @Override
-    public void setFragmentVisible(int type, boolean fragmentVisible) {
-        if (type == GENERAL) this.fragmentVisible = fragmentVisible;
+//    @Override
+    public void setFragmentVisible(PluginType type, boolean fragmentVisible) {
+        if (type == PluginType.GENERAL) this.fragmentVisible = fragmentVisible;
     }
 
     @Override
@@ -153,11 +179,11 @@ public class TuneProfile implements PluginBase {
     }
 
     @Override
-    public int getType() {
-        return PluginBase.GENERAL;
+    public PluginType getType() {
+        return PluginType.GENERAL;
     }
 
-    public static TuneProfile getPlugin() {
+    /*public static TuneProfile getPlugin() {
         if (tuneProfile == null)
             try {
                 tuneProfile = new TuneProfile();
@@ -165,7 +191,7 @@ public class TuneProfile implements PluginBase {
                 e.printStackTrace();
             }
         return tuneProfile;
-    }
+    } */
 
     public void invoke(String initiator, boolean allowNotification) {
         // invoke
@@ -182,7 +208,11 @@ public class TuneProfile implements PluginBase {
     }
 
     public static synchronized Double getBasal(Integer hour){
-        getPlugin().getProfile();
+        try{
+            getPlugin().getProfile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         if(profile.equals(null))
             return 0d;
         Calendar c = Calendar.getInstance();
@@ -294,8 +324,14 @@ public class TuneProfile implements PluginBase {
         } else {
             //log.debug(">>> calculateFromTreatmentsAndTemps Cache miss " + new Date(time).toLocaleString());
         }
-        IobTotal bolusIob = getPlugin().getCalculationToTimeTreatments(time).round();
-        IobTotal basalIob = getPlugin().getCalculationToTimeTempBasals(time).round();
+        IobTotal bolusIob = null;
+        IobTotal basalIob = null;
+        try {
+            bolusIob = getPlugin().getCalculationToTimeTreatments(time).round();
+            basalIob = getPlugin().getCalculationToTimeTempBasals(time).round();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         IobTotal iobTotal = IobTotal.combine(bolusIob, basalIob).round();
         if (time < System.currentTimeMillis()) {

@@ -1,5 +1,7 @@
 package info.nightscout.androidaps;
 
+import info.nightscout.utils.T;
+
 /**
  * Created by mike on 07.06.2016.
  */
@@ -39,10 +41,10 @@ public class Constants {
 
     // Temp targets
     public static final int defaultActivityTTDuration = 90; // min
-    public static final double defaultActivityTTmgdl = 90d;
+    public static final double defaultActivityTTmgdl = 140d;
     public static final double defaultActivityTTmmol = 8d;
     public static final int defaultEatingSoonTTDuration = 45; // min
-    public static final double defaultEatingSoonTTmgdl = 140d;
+    public static final double defaultEatingSoonTTmgdl = 90d;
     public static final double defaultEatingSoonTTmmol = 5d;
     public static final int defaultHypoTTDuration = 30; // min
     public static final double defaultHypoTTmgdl = 120d;
@@ -61,4 +63,7 @@ public class Constants {
     // Pump
     public static final int PUMP_MAX_CONNECTION_TIME_IN_SECONDS = 120 - 1;
     public static final int MIN_WATCHDOG_INTERVAL_IN_SECONDS = 12 * 60;
+
+    //SMS Communicator
+    public static final long SMS_CONFIRM_TIMEOUT = T.mins(5).msecs();
 }

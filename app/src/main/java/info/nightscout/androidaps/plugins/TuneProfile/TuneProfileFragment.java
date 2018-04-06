@@ -31,6 +31,10 @@ import info.nightscout.androidaps.plugins.Common.SubscriberFragment;
 
 public class TuneProfileFragment extends SubscriberFragment implements View.OnClickListener {
     private static Logger log = LoggerFactory.getLogger(TuneProfileFragment.class);
+    public TuneProfileFragment() {super();}
+    static public TuneProfile getPlugin() throws IOException {
+        return TuneProfile.getPlugin();
+    }
 
     Button runTuneNowButton;
     TextView warningView;
@@ -51,7 +55,7 @@ public class TuneProfileFragment extends SubscriberFragment implements View.OnCl
             tune_days = (EditText) view.findViewById(R.id.tune_days);
             runTuneNowButton.setOnClickListener(this);
 
-            //updateGUI();
+            updateGUI();
             return view;
         } catch (Exception e) {
             Crashlytics.logException(e);

@@ -35,7 +35,7 @@ import info.nightscout.androidaps.data.IobTotal;
 import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.BGDatum;
 import info.nightscout.androidaps.db.BgReading;
-import info.nightscout.androidaps.db.Treatment;
+import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.utils.SP;
 
 import static info.nightscout.androidaps.plugins.TuneProfile.TuneProfile.profile;

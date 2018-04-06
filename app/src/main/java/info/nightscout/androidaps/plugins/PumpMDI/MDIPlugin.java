@@ -15,20 +15,18 @@ import info.nightscout.androidaps.data.DetailedBolusInfo;
 import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.data.PumpEnactResult;
 import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.interfaces.PluginDescription;
+import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.PumpDescription;
 import info.nightscout.androidaps.interfaces.PumpInterface;
+import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.utils.DateUtil;
 
 /**
  * Created by mike on 05.08.2016.
  */
-public class MDIPlugin implements PluginBase, PumpInterface {
+public class MDIPlugin extends PluginBase implements PumpInterface {
     private static Logger log = LoggerFactory.getLogger(MDIPlugin.class);
-
-    private boolean fragmentEnabled = false;
-    private boolean fragmentVisible = false;
-
-    private PumpDescription pumpDescription = new PumpDescription();
 
     private static MDIPlugin plugin = null;
 
@@ -38,7 +36,13 @@ public class MDIPlugin implements PluginBase, PumpInterface {
         return plugin;
     }
 
+    private PumpDescription pumpDescription = new PumpDescription();
+
     private MDIPlugin() {
+        super(new PluginDescription()
+                .mainType(PluginType.PUMP)
+                .pluginName(R.string.mdi)
+        );
         pumpDescription.isBolusCapable = true;
         pumpDescription.bolusStep = 0.5d;
 
@@ -49,69 +53,15 @@ public class MDIPlugin implements PluginBase, PumpInterface {
     }
 
     @Override
-    public String getFragmentClass() {
-        return null;
-    }
-
-    @Override
-    public String getName() {
-        return MainApp.instance().getString(R.string.mdi);
-    }
-
-    @Override
-    public String getNameShort() {
-        // use long name as fallback (not visible in tabs)
-        return getName();
-    }
-
-    @Override
-    public boolean isEnabled(int type) {
-        return type == PUMP && fragmentEnabled;
-    }
-
-    @Override
-    public boolean isVisibleInTabs(int type) {
-        return false;
-    }
-
-    @Override
-    public boolean canBeHidden(int type) {
-        return true;
-    }
-
-    @Override
-    public boolean hasFragment() {
-        return false;
-    }
-
-    @Override
-    public boolean showInList(int type) {
-        return true;
-    }
-
-    @Override
-    public void setPluginEnabled(int type, boolean fragmentEnabled) {
-        if (type == PUMP) this.fragmentEnabled = fragmentEnabled;
-    }
-
-    @Override
-    public void setFragmentVisible(int type, boolean fragmentVisible) {
-        if (type == PUMP) this.fragmentVisible = fragmentVisible;
-    }
-
-    @Override
-    public int getPreferencesId() {
-        return -1;
-    }
-
-    @Override
-    public int getType() {
-        return PluginBase.PUMP;
-    }
-
-    @Override
     public boolean isFakingTempsByExtendedBoluses() {
         return false;
+    }
+
+    @Override
+    public PumpEnactResult loadTDDs() {
+        //no result, could read DB in the future?
+        PumpEnactResult result = new PumpEnactResult();
+        return result;
     }
 
     @Override
@@ -185,7 +135,7 @@ public class MDIPlugin implements PluginBase, PumpInterface {
         result.bolusDelivered = detailedBolusInfo.insulin;
         result.carbsDelivered = detailedBolusInfo.carbs;
         result.comment = MainApp.instance().getString(R.string.virtualpump_resultok);
-        MainApp.getConfigBuilder().addToHistoryTreatment(detailedBolusInfo);
+        TreatmentsPlugin.getPlugin().addToHistoryTreatment(detailedBolusInfo);
         return result;
     }
 

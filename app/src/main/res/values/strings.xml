@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <string name="treatmentssafety_title">Tratments safety</string>
     <string name="treatmentssafety_maxbolus_title">Max allowed bolus [U]</string>
     <string name="treatmentssafety_maxcarbs_title">Max allowed carbs [g]</string>
@@ -80,6 +80,8 @@
     <string name="treatments">Treatments</string>
     <string name="virtualpump">Virtual Pump</string>
     <string name="careportal">Careportal</string>
+    <string name="autotune">Autotune</string>
+    <string name="autotune_shortname">AT</string>
 
 
     <string name="configbuilder_pump">Pump</string>
@@ -663,8 +665,8 @@
     <string name="free_peak_oref">Free-Peak Oref</string>
     <string name="rapid_acting_oref">Rapid-Acting Oref</string>
     <string name="ultrarapid_oref">Ultra-Rapid Oref</string>
-    <string name="dia_too_short" formatted="false">DIA of %s too short - using %s instead!</string>
-    <string name="activate_profile">ACTIVATE PROFILE</string>
+    <string name="dia_too_short" formatted="false">DIA of %f too short - using %f instead!</string>
+    <string name="activate_profile">Activate profile</string>
     <string name="date">Date</string>
     <string name="invalid">INVALID</string>
     <string name="waitingforpairing">Waiting for pairing on pump</string>
@@ -989,5 +991,12 @@
     <string name="key_treatmentssafety_maxcarbs">treatmentssafety_maxcarbs</string>
     <string name="unsafeusage">unsafe usage</string>
     <string name="key_openapsama_useautosens" translatable="false">openapsama_useautosens</string>
+    <string name="readstatusfailed">Read status failed</string>
+    <string name="record_pump_site_change">Record pump site change</string>
+    <string name="record_insulin_cartridge_change">Record insulin cartridge change</string>
+    <string name="smbalwaysdisabled">SMB always and after carbs disabled because active BG source doesn\'t support advanced filtering</string>
+    <string name="smbnotallowedinopenloopmode">SMB not allowed in open loop mode</string>
+    <string name="food_short">Food</string>
+    <string name="iobcobcalculator" translatable="false">IobCobCalculator</string>
+    <string name="loopdisconnectedfor">Disconnected (%d m)</string>
 </resources>
-

@@ -13,7 +13,9 @@ import java.util.Locale;
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.ConstraintChecker;
 import info.nightscout.androidaps.data.Profile;
+import info.nightscout.androidaps.db.DatabaseHelper;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.utils.SP;
 
@@ -28,8 +30,8 @@ import static org.mockito.Mockito.when;
  */
 
 public class AAPSMocker {
-    static String validProfile = "{\"dia\":\"3\",\"carbratio\":[{\"time\":\"00:00\",\"value\":\"30\"}],\"carbs_hr\":\"20\",\"delay\":\"20\",\"sens\":[{\"time\":\"00:00\",\"value\":\"100\"},{\"time\":\"2:00\",\"value\":\"110\"}],\"timezone\":\"UTC\",\"basal\":[{\"time\":\"00:00\",\"value\":\"1\"}],\"target_low\":[{\"time\":\"00:00\",\"value\":\"4\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"5\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}";
-    static Profile profile;
+    private static String validProfile = "{\"dia\":\"3\",\"carbratio\":[{\"time\":\"00:00\",\"value\":\"30\"}],\"carbs_hr\":\"20\",\"delay\":\"20\",\"sens\":[{\"time\":\"00:00\",\"value\":\"100\"},{\"time\":\"2:00\",\"value\":\"110\"}],\"timezone\":\"UTC\",\"basal\":[{\"time\":\"00:00\",\"value\":\"1\"}],\"target_low\":[{\"time\":\"00:00\",\"value\":\"4\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"5\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}";
+    private static Profile profile;
 
     public static void mockStrings() {
         Locale.setDefault(new Locale("en", "US"));
@@ -56,6 +58,28 @@ public class AAPSMocker {
         when(MainApp.gs(R.string.pumpisnottempbasalcapable)).thenReturn("Pump is not temp basal capable");
         when(MainApp.gs(R.string.loop)).thenReturn("Loop");
         when(MainApp.gs(R.string.loop_shortname)).thenReturn("LOOP");
+        when(MainApp.gs(R.string.smbalwaysdisabled)).thenReturn("SMB always and after carbs disabled because active BG source doesn\\'t support advanced filtering");
+        when(MainApp.gs(R.string.smbnotallowedinopenloopmode)).thenReturn("SMB not allowed in open loop mode");
+        when(MainApp.gs(R.string.Glimp)).thenReturn("Glimp");
+        when(MainApp.gs(R.string.glucose)).thenReturn("Glucose");
+        when(MainApp.gs(R.string.delta)).thenReturn("Delta");
+        when(MainApp.gs(R.string.short_avgdelta)).thenReturn("Short avg. delta");
+        when(MainApp.gs(R.string.long_avgdelta)).thenReturn("Long avg. delta");
+        when(MainApp.gs(R.string.zerovalueinprofile)).thenReturn("Invalid profile: %s");
+        when(MainApp.gs(R.string.success)).thenReturn("Success");
+        when(MainApp.gs(R.string.enacted)).thenReturn("Enacted");
+        when(MainApp.gs(R.string.comment)).thenReturn("Comment");
+        when(MainApp.gs(R.string.smb_shortname)).thenReturn("SMB");
+        when(MainApp.gs(R.string.canceltemp)).thenReturn("Cancel temp basal");
+        when(MainApp.gs(R.string.duration)).thenReturn("Duration");
+        when(MainApp.gs(R.string.percent)).thenReturn("Percent");
+        when(MainApp.gs(R.string.absolute)).thenReturn("Absolute");
+        when(MainApp.gs(R.string.waitingforpumpresult)).thenReturn("Waiting for result");
+        when(MainApp.gs(R.string.insulin_unit_shortname)).thenReturn("U");
+        when(MainApp.gs(R.string.minimalbasalvaluereplaced)).thenReturn("Basal value replaced by minimal supported value");
+        when(MainApp.gs(R.string.basalprofilenotaligned)).thenReturn("Basal values not aligned to hours: %s");
+        when(MainApp.gs(R.string.minago)).thenReturn("%d min ago");
+        when(MainApp.gs(R.string.hoursago)).thenReturn("%.1fh ago");
     }
 
     public static MainApp mockMainApp() {
@@ -69,6 +93,11 @@ public class AAPSMocker {
         PowerMockito.mockStatic(ConfigBuilderPlugin.class);
         ConfigBuilderPlugin configBuilderPlugin = mock(ConfigBuilderPlugin.class);
         when(MainApp.getConfigBuilder()).thenReturn(configBuilderPlugin);
+    }
+
+    public static void mockConstraintsChecker() {
+        ConstraintChecker constraintChecker = mock(ConstraintChecker.class);
+        when(MainApp.getConstraintChecker()).thenReturn(constraintChecker);
     }
 
     public static void mockBus() {
@@ -88,9 +117,43 @@ public class AAPSMocker {
         when(MainApp.instance().getApplicationContext()).thenReturn(context);
     }
 
-    public static Profile getValidProfile() throws JSONException {
-        if (profile == null)
-            profile = new Profile(new JSONObject(validProfile), Constants.MGDL);
+    public static void mockDatabaseHelper() {
+        DatabaseHelper databaseHelper = mock(DatabaseHelper.class);
+        when(MainApp.getDbHelper()).thenReturn(databaseHelper);
+    }
+
+    public static Profile getValidProfile() {
+        try {
+            if (profile == null)
+                profile = new Profile(new JSONObject(validProfile), Constants.MGDL);
+        } catch (JSONException ignored) {}
         return profile;
     }
+
+    private static MockedBus bus = new MockedBus();
+
+    public static void prepareMockedBus() {
+        when(MainApp.bus()).thenReturn(bus);
+    }
+
+    public static class MockedBus extends Bus {
+        public boolean registered = false;
+        public boolean notificationSent = false;
+
+        @Override
+        public void register(Object event) {
+            registered = true;
+        }
+
+        @Override
+        public void unregister(Object event) {
+            registered = false;
+        }
+
+        @Override
+        public void post(Object event) {
+            notificationSent = true;
+        }
+    }
+
 }

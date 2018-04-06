@@ -15,12 +15,13 @@ import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.interfaces.Constraint;
-import info.nightscout.androidaps.interfaces.PluginBase;
+import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSAMA.OpenAPSAMAPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSMA.OpenAPSMAPlugin;
 import info.nightscout.androidaps.plugins.OpenAPSSMB.OpenAPSSMBPlugin;
 import info.nightscout.androidaps.plugins.PumpVirtual.VirtualPumpPlugin;
+import info.nightscout.androidaps.plugins.Source.SourceGlimpPlugin;
 import info.nightscout.utils.SP;
 
 import static org.mockito.Mockito.when;
@@ -70,10 +71,32 @@ public class SafetyPluginTest {
     @Test
     public void notEnabledSMBInPreferencesDisablesSMB() throws Exception {
         when(SP.getBoolean(R.string.key_use_smb, false)).thenReturn(false);
+        when(MainApp.getConstraintChecker().isClosedLoopAllowed()).thenReturn(new Constraint<>(true));
 
         Constraint<Boolean> c = new Constraint<>(true);
         c = safetyPlugin.isSMBModeEnabled(c);
         Assert.assertEquals(true, c.getReasons().contains("SMB disabled in preferences"));
+        Assert.assertEquals(Boolean.FALSE, c.value());
+    }
+
+    @Test
+    public void openLoopPreventsSMB() throws Exception {
+        when(SP.getBoolean(R.string.key_use_smb, false)).thenReturn(true);
+        when(MainApp.getConstraintChecker().isClosedLoopAllowed()).thenReturn(new Constraint<>(false));
+
+        Constraint<Boolean> c = new Constraint<>(true);
+        c = safetyPlugin.isSMBModeEnabled(c);
+        Assert.assertEquals(true, c.getReasons().contains("SMB not allowed in open loop mode"));
+        Assert.assertEquals(Boolean.FALSE, c.value());
+    }
+
+    @Test
+    public void bgsourceShouldPreventSMBAlways() throws Exception {
+        when(MainApp.getConfigBuilder().getActiveBgSource()).thenReturn(SourceGlimpPlugin.getPlugin());
+
+        Constraint<Boolean> c = new Constraint<>(true);
+        c = safetyPlugin.isAdvancedFilteringEnabled(c);
+        Assert.assertEquals("Safety: SMB always and after carbs disabled because active BG source doesn\\'t support advanced filtering", c.getReasons());
         Assert.assertEquals(Boolean.FALSE, c.value());
     }
 
@@ -185,9 +208,9 @@ public class SafetyPluginTest {
     public void iobShouldBeLimited() throws Exception {
         when(SP.getDouble(R.string.key_openapsma_max_iob, 1.5d)).thenReturn(1.5d);
         when(SP.getString(R.string.key_age, "")).thenReturn("teenage");
-        OpenAPSMAPlugin.getPlugin().setPluginEnabled(PluginBase.APS, true);
-        OpenAPSAMAPlugin.getPlugin().setPluginEnabled(PluginBase.APS, true);
-        OpenAPSSMBPlugin.getPlugin().setPluginEnabled(PluginBase.APS, true);
+        OpenAPSMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
+        OpenAPSAMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
+        OpenAPSSMBPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
 
         // Apply all limits
         Constraint<Double> d = new Constraint<>(Constants.REALLYHIGHIOB);
@@ -204,8 +227,11 @@ public class SafetyPluginTest {
     public void prepareMock() {
         AAPSMocker.mockMainApp();
         AAPSMocker.mockConfigBuilder();
+        AAPSMocker.mockConstraintsChecker();
         AAPSMocker.mockSP();
         AAPSMocker.mockStrings();
+        AAPSMocker.mockBus();
+
 
         when(MainApp.getConfigBuilder().getActivePump()).thenReturn(pump);
 

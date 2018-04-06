@@ -3,7 +3,6 @@ package info.nightscout.androidaps.plugins.Careportal.Dialogs;
 
 import android.app.Activity;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AlertDialog;
@@ -50,12 +49,8 @@ import info.nightscout.androidaps.db.CareportalEvent;
 import info.nightscout.androidaps.db.ProfileSwitch;
 import info.nightscout.androidaps.db.Source;
 import info.nightscout.androidaps.db.TempTarget;
-import info.nightscout.androidaps.events.EventNewBasalProfile;
-import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.plugins.Careportal.OptionsToShow;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.Overview.Dialogs.ErrorHelperActivity;
-import info.nightscout.androidaps.queue.Callback;
+import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.FabricPrivacy;
 import info.nightscout.utils.HardLimits;
@@ -109,6 +104,8 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
 
     Date eventTime;
 
+    private static Integer seconds = null;
+
     public void setOptions(OptionsToShow options, int event) {
         this.options = options;
         this.event = MainApp.sResources.getString(event);
@@ -116,6 +113,10 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
 
     public NewNSTreatmentDialog() {
         super();
+
+        if (seconds == null) {
+            seconds = new Double(Math.random() * 59).intValue();
+        }
     }
 
     @Override
@@ -343,18 +344,18 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
         editTimeshift = (NumberPicker) view.findViewById(R.id.careportal_newnstreatment_timeshift);
         editTimeshift.setParams(0d, (double) Constants.CPP_MIN_TIMESHIFT, (double) Constants.CPP_MAX_TIMESHIFT, 1d, new DecimalFormat("0"), false);
 
-        ProfileSwitch ps = MainApp.getConfigBuilder().getProfileSwitchFromHistory(System.currentTimeMillis());
+        ProfileSwitch ps = TreatmentsPlugin.getPlugin().getProfileSwitchFromHistory(DateUtil.now());
         if (ps != null && ps.isCPP) {
             final int percentage = ps.percentage;
             final int timeshift = ps.timeshift;
             reuseButton.setText(reuseButton.getText() + " " + percentage + "% " + timeshift + "h");
-            reuseButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    editPercentage.setValue((double) percentage);
-                    editTimeshift.setValue((double) timeshift);
-                }
+            reuseButton.setOnClickListener(v -> {
+                editPercentage.setValue((double) percentage);
+                editTimeshift.setValue((double) timeshift);
             });
+        }
+        if (ps == null) {
+            options.duration = false;
         }
 
         showOrHide((ViewGroup) view.findViewById(R.id.careportal_newnstreatment_eventtime_layout), options.date);
@@ -443,7 +444,7 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
     public void onTimeSet(RadialPickerLayout view, int hourOfDay, int minute, int second) {
         eventTime.setHours(hourOfDay);
         eventTime.setMinutes(minute);
-        eventTime.setSeconds(second);
+        eventTime.setSeconds(this.seconds++); // randomize seconds to prevent creating record of the same time, if user choose time manually
         timeButton.setText(DateUtil.timeString(eventTime));
         updateBGforDateTime();
     }
@@ -695,17 +696,16 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
                 } else if (options.executeTempTarget) {
                     try {
                         if ((data.has("targetBottom") && data.has("targetTop")) || (data.has("duration") && data.getInt("duration") == 0)) {
-                            TempTarget tempTarget = new TempTarget();
-                            tempTarget.date = eventTime.getTime();
-                            tempTarget.durationInMinutes = data.getInt("duration");
-                            tempTarget.reason = data.getString("reason");
-                            tempTarget.source = Source.USER;
+                            TempTarget tempTarget = new TempTarget()
+                                    .date(eventTime.getTime())
+                                    .duration(data.getInt("duration"))
+                                    .reason(data.getString("reason"))
+                                    .source(Source.USER);
                             if (tempTarget.durationInMinutes != 0) {
-                                tempTarget.low = Profile.toMgdl(data.getDouble("targetBottom"), profile.getUnits());
-                                tempTarget.high = Profile.toMgdl(data.getDouble("targetTop"), profile.getUnits());
+                                tempTarget.low(Profile.toMgdl(data.getDouble("targetBottom"), profile.getUnits()))
+                                        .high(Profile.toMgdl(data.getDouble("targetTop"), profile.getUnits()));
                             } else {
-                                tempTarget.low = 0;
-                                tempTarget.high = 0;
+                                tempTarget.low(0).high(0);
                             }
                             log.debug("Creating new TempTarget db record: " + tempTarget.toString());
                             MainApp.getDbHelper().createOrUpdate(tempTarget);
@@ -736,27 +736,12 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
         profileSwitch.isCPP = percentage != 100 || timeshift != 0;
         profileSwitch.timeshift = timeshift;
         profileSwitch.percentage = percentage;
-        MainApp.getConfigBuilder().addToHistoryProfileSwitch(profileSwitch);
-
-        ConfigBuilderPlugin.getCommandQueue().setProfile(profileSwitch.getProfileObject(), new Callback() {
-            @Override
-            public void run() {
-                if (!result.success) {
-                    Intent i = new Intent(MainApp.instance(), ErrorHelperActivity.class);
-                    i.putExtra("soundid", R.raw.boluserror);
-                    i.putExtra("status", result.comment);
-                    i.putExtra("title", MainApp.sResources.getString(R.string.failedupdatebasalprofile));
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    MainApp.instance().startActivity(i);
-                }
-                MainApp.bus().post(new EventNewBasalProfile());
-            }
-        });
+        TreatmentsPlugin.getPlugin().addToHistoryProfileSwitch(profileSwitch);
         FabricPrivacy.getInstance().logCustom(new CustomEvent("ProfileSwitch"));
     }
 
     public static void doProfileSwitch(final int duration, final int percentage, final int timeshift) {
-        ProfileSwitch profileSwitch = MainApp.getConfigBuilder().getProfileSwitchFromHistory(System.currentTimeMillis());
+        ProfileSwitch profileSwitch = TreatmentsPlugin.getPlugin().getProfileSwitchFromHistory(System.currentTimeMillis());
         if (profileSwitch != null) {
             profileSwitch = new ProfileSwitch();
             profileSwitch.date = System.currentTimeMillis();
@@ -768,22 +753,7 @@ public class NewNSTreatmentDialog extends DialogFragment implements View.OnClick
             profileSwitch.isCPP = percentage != 100 || timeshift != 0;
             profileSwitch.timeshift = timeshift;
             profileSwitch.percentage = percentage;
-            MainApp.getConfigBuilder().addToHistoryProfileSwitch(profileSwitch);
-
-            ConfigBuilderPlugin.getCommandQueue().setProfile(profileSwitch.getProfileObject(), new Callback() {
-                @Override
-                public void run() {
-                    if (!result.success) {
-                        Intent i = new Intent(MainApp.instance(), ErrorHelperActivity.class);
-                        i.putExtra("soundid", R.raw.boluserror);
-                        i.putExtra("status", result.comment);
-                        i.putExtra("title", MainApp.sResources.getString(R.string.failedupdatebasalprofile));
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        MainApp.instance().startActivity(i);
-                    }
-                    MainApp.bus().post(new EventNewBasalProfile());
-                }
-            });
+            TreatmentsPlugin.getPlugin().addToHistoryProfileSwitch(profileSwitch);
             FabricPrivacy.getInstance().logCustom(new CustomEvent("ProfileSwitch"));
         } else {
             log.error("No profile switch existing");

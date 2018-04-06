@@ -10,7 +10,8 @@ import java.util.List;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.data.Profile;
-import info.nightscout.androidaps.db.Treatment;
+import info.nightscout.androidaps.interfaces.PluginType;
+import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.plugins.SensitivityAAPS.SensitivityAAPSPlugin;
 import info.nightscout.androidaps.plugins.SensitivityWeightedAverage.SensitivityWeightedAveragePlugin;
@@ -33,7 +34,7 @@ public class AutosensData {
             time = t.date;
             carbs = t.carbs;
             remaining = t.carbs;
-            if (SensitivityAAPSPlugin.getPlugin().isEnabled(PluginBase.SENSITIVITY) || SensitivityWeightedAveragePlugin.getPlugin().isEnabled(PluginBase.SENSITIVITY)) {
+            if (SensitivityAAPSPlugin.getPlugin().isEnabled(PluginType.SENSITIVITY) || SensitivityWeightedAveragePlugin.getPlugin().isEnabled(PluginType.SENSITIVITY)) {
                 double maxAbsorptionHours = SP.getDouble(R.string.key_absorption_maxtime, 4d);
                 Profile profile = MainApp.getConfigBuilder().getProfile(t.date);
                 double sens = Profile.toMgdl(profile.getIsf(t.date), profile.getUnits());
