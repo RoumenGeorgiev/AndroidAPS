@@ -70,9 +70,7 @@ import java.util.List;
 
 public class TuneProfile extends PluginBase {
 
-    private boolean alwaysEnabled = false;
     boolean fragmentVisible = true;
-    private boolean alwaysVisible = false;
 
     private static TuneProfile tuneProfile = null;
     private static Logger log = LoggerFactory.getLogger(TuneProfile.class);
@@ -107,8 +105,6 @@ public class TuneProfile extends PluginBase {
         super(new PluginDescription()
                 .mainType(PluginType.GENERAL)
                 .fragmentClass(TuneProfileFragment.class.getName())
-                .alwayVisible(true)
-                .alwaysEnabled(false)
                 .pluginName(R.string.autotune)
                 .shortName(R.string.autotune_shortname)
         );
@@ -134,62 +130,6 @@ public class TuneProfile extends PluginBase {
         return getName();
     }
 
-//    @Override
-    public boolean isEnabled(PluginType type) {
-        return type == PluginType.GENERAL && true;
-    }
-
-//    @Override
-    public void setPluginEnabled(int type, boolean fragmentEnabled) {
-
-    }
-
-
-//    @Override
-    public boolean setFragmentVisible() {
-        return false;
-    }
-
-//    @Override
-    public boolean canBeHidden(int type) {
-        return true;
-    }
-
-    @Override
-    public boolean hasFragment() {
-        return true;
-    }
-
-//    @Override
-    public boolean showInList(int type) {
-        return !Config.NSCLIENT && !Config.G5UPLOADER;
-    }
-
-
-    @Override
-    public void setFragmentVisible(PluginType type, boolean fragmentVisible) {
-        this.fragmentVisible = true;
-    }
-
-    @Override
-    public int getPreferencesId() {
-        return -1;
-    }
-
-    @Override
-    public PluginType getType() {
-        return PluginType.GENERAL;
-    }
-
-    /*public static TuneProfile getPlugin() {
-        if (tuneProfile == null)
-            try {
-                tuneProfile = new TuneProfile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        return tuneProfile;
-    } */
 
     public void invoke(String initiator, boolean allowNotification) {
         // invoke
