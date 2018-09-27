@@ -3,7 +3,7 @@ package info.nightscout.androidaps.plugins.PumpDanaR.comm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 
 
@@ -14,12 +14,10 @@ import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
  * THIS IS BROKEN IN PUMP... SENDING ONLY 1 PROFILE
  */
 public class MsgSettingBasalProfileAll extends MessageBase {
-    private static Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgSettingBasalProfileAll.class);
 
     public MsgSettingBasalProfileAll() {
         SetCommand(0x3206);
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     public void handleMessage(byte[] bytes) {
@@ -39,40 +37,31 @@ public class MsgSettingBasalProfileAll extends MessageBase {
             pump.pumpProfiles = new double[4][];
             for (int profile = 0; profile < 4; profile++) {
                 int position = intFromBuff(bytes, 49 * profile, 1);
+                log.debug("position " + position);
                 pump.pumpProfiles[position] = new double[24];
                 for (int index = 0; index < 24; index++) {
                     int basal = intFromBuff(bytes, 59 * profile + 2 * index + 1, 2);
                     if (basal < 10) basal = 0;
-                    if (L.isEnabled(L.PUMPCOMM))
-                        log.debug("position " + position + " index " + index);
+                    log.debug("position " + position + " index " + index);
                     pump.pumpProfiles[position][index] = basal / 100d;
                 }
             }
         }
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             if (pump.basal48Enable) {
                 for (int profile = 0; profile < 4; profile++) {
-                    for (int index = 0; index < 48; index++) {
-                        try {
-                            log.debug("Basal profile " + profile + ": " + String.format("%02d", index) + "h: " + pump.pumpProfiles[profile][index]);
-                        } catch (Exception e){
-                            log.error("Unhandled exception" , e);
-                        }
+                    for (int index = 0; index < 24; index++) {
+                        log.debug("Basal profile " + profile + ": " + String.format("%02d", index) + "h: " + pump.pumpProfiles[profile][index]);
                     }
                 }
             } else {
                 for (int profile = 0; profile < 4; profile++) {
-                    for (int index = 0; index < 24; index++) {
-                        //this is absurd  pump.pumpProfiles[profile][index] returns nullPointerException
-                        try {
-                            log.debug("Basal profile " + profile + ": " +
-                                    String.format("%02d", (index / 2)) +
-                                    ":" + String.format("%02d", (index % 2) * 30) + " : " +
-                                    pump.pumpProfiles[profile][index]);
-                        } catch (Exception e){
-                            log.error("Unhandled exception" , e);
-                        }
+                    for (int index = 0; index < 48; index++) {
+                        log.debug("Basal profile " + profile + ": " +
+                                String.format("%02d", (index / 2)) +
+                                ":" + String.format("%02d", (index % 2) * 30) + " : " +
+                                pump.pumpProfiles[profile][index]);
                     }
                 }
             }

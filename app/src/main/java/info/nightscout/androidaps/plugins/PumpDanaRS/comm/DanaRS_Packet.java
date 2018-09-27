@@ -100,8 +100,8 @@ public class DanaRS_Packet {
         return ret;
     }
 
-    public static synchronized long dateTimeSecFromBuff(byte[] buff, int offset) {
-        return
+    public static Date dateTimeSecFromBuff(byte[] buff, int offset) {
+        Date date =
                 new Date(
                         100 + intFromBuff(buff, offset, 1),
                         intFromBuff(buff, offset + 1, 1) - 1,
@@ -109,7 +109,8 @@ public class DanaRS_Packet {
                         intFromBuff(buff, offset + 3, 1),
                         intFromBuff(buff, offset + 4, 1),
                         intFromBuff(buff, offset + 5, 1)
-                ).getTime();
+                );
+        return date;
     }
 
     protected static int intFromBuff(byte[] b, int srcStart, int srcLength) {
@@ -142,13 +143,14 @@ public class DanaRS_Packet {
         return new String(strbuff, StandardCharsets.UTF_8);
     }
 
-    public static long dateFromBuff(byte[] buff, int offset) {
-        return
+    public static Date dateFromBuff(byte[] buff, int offset) {
+        Date date =
                 new Date(
                         100 + byteArrayToInt(getBytes(buff, offset, 1)),
                         byteArrayToInt(getBytes(buff, offset + 1, 1)) - 1,
                         byteArrayToInt(getBytes(buff, offset + 2, 1))
-                ).getTime();
+                );
+        return date;
     }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)

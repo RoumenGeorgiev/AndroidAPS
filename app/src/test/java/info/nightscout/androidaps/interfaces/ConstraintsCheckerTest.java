@@ -75,15 +75,15 @@ public class ConstraintsCheckerTest {
 
     @Test
     public void isClosedLoopAllowedTest() throws Exception {
-        when(SP.getString(R.string.key_aps_mode, "open")).thenReturn("closed");
-        objectivesPlugin.objectives.get(3).setStartedOn(null);
+        when(SP.getString("aps_mode", "open")).thenReturn("closed");
+        objectivesPlugin.objectives.get(3).setStarted(new Date(0));
 
         Constraint<Boolean> c = constraintChecker.isClosedLoopAllowed();
         Assert.assertEquals(true, c.getReasonList().size() == 2); // Safety & Objectives
         Assert.assertEquals(true, c.getMostLimitedReasonList().size() == 2); // Safety & Objectives
         Assert.assertEquals(Boolean.FALSE, c.value());
 
-        when(SP.getString(R.string.key_aps_mode, "open")).thenReturn("open");
+        when(SP.getString("aps_mode", "open")).thenReturn("open");
         c = constraintChecker.isClosedLoopAllowed();
         Assert.assertEquals(true, c.getReasonList().size() == 3); // 2x Safety & Objectives
         Assert.assertEquals(true, c.getMostLimitedReasonList().size() == 3); // 2x Safety & Objectives
@@ -92,7 +92,7 @@ public class ConstraintsCheckerTest {
 
     @Test
     public void isAutosensModeEnabledTest() throws Exception {
-        objectivesPlugin.objectives.get(5).setStartedOn(null);
+        objectivesPlugin.objectives.get(5).setStarted(new Date(0));
         when(SP.getBoolean(R.string.key_openapsama_useautosens, false)).thenReturn(false);
 
         Constraint<Boolean> c = constraintChecker.isAutosensModeEnabled();
@@ -103,7 +103,7 @@ public class ConstraintsCheckerTest {
 
     @Test
     public void isAMAModeEnabledTest() throws Exception {
-        objectivesPlugin.objectives.get(6).setStartedOn(null);
+        objectivesPlugin.objectives.get(6).setStarted(new Date(0));
 
         Constraint<Boolean> c = constraintChecker.isAMAModeEnabled();
         Assert.assertEquals(true, c.getReasonList().size() == 1); // Objectives
@@ -113,7 +113,7 @@ public class ConstraintsCheckerTest {
 
     @Test
     public void isAdvancedFilteringEnabledTest() throws Exception {
-        when(ConfigBuilderPlugin.getPlugin().getActiveBgSource()).thenReturn(SourceGlimpPlugin.getPlugin());
+        when(MainApp.getConfigBuilder().getActiveBgSource()).thenReturn(SourceGlimpPlugin.getPlugin());
 
         Constraint<Boolean> c = constraintChecker.isAdvancedFilteringEnabled();
         Assert.assertEquals(true, c.getReasonList().size() == 1); // Safety
@@ -123,7 +123,7 @@ public class ConstraintsCheckerTest {
 
     @Test
     public void isSMBModeEnabledTest() throws Exception {
-        objectivesPlugin.objectives.get(7).setStartedOn(null);
+        objectivesPlugin.objectives.get(7).setStarted(new Date(0));
         when(SP.getBoolean(R.string.key_use_smb, false)).thenReturn(false);
         when(MainApp.getConstraintChecker().isClosedLoopAllowed()).thenReturn(new Constraint<>(true));
 
@@ -156,7 +156,7 @@ public class ConstraintsCheckerTest {
         // Apply all limits
         Constraint<Double> d = constraintChecker.getMaxBasalAllowed(AAPSMocker.getValidProfile());
         Assert.assertEquals(0.8d, d.value());
-        Assert.assertEquals(6, d.getReasonList().size());
+        Assert.assertEquals(true, d.getReasonList().size() == 7); // 4x Safety & RS & R & Insight
         Assert.assertEquals("DanaR: Limiting basal rate to 0.80 U/h because of pump limit", d.getMostLimitedReasons());
 
     }
@@ -183,7 +183,7 @@ public class ConstraintsCheckerTest {
         // Apply all limits
         Constraint<Integer> i = constraintChecker.getMaxBasalPercentAllowed(AAPSMocker.getValidProfile());
         Assert.assertEquals((Integer) 100, i.value());
-        Assert.assertEquals(9, i.getReasonList().size()); // 6x Safety & RS & R & Insight
+        Assert.assertEquals(true, i.getReasonList().size() == 9); // 6x Safety & RS & R & Insight
         Assert.assertEquals("Safety: Limiting percent rate to 100% because of pump limit", i.getMostLimitedReasons());
 
     }
@@ -229,36 +229,19 @@ public class ConstraintsCheckerTest {
 
     // applyMaxIOBConstraints tests
     @Test
-    public void iobAMAShouldBeLimited() {
+    public void iobShouldBeLimited() throws Exception {
         // No limit by default
         when(SP.getDouble(R.string.key_openapsma_max_iob, 1.5d)).thenReturn(1.5d);
         when(SP.getString(R.string.key_age, "")).thenReturn("teenage");
+        OpenAPSMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
         OpenAPSAMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
-        OpenAPSMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, false);
-        OpenAPSSMBPlugin.getPlugin().setPluginEnabled(PluginType.APS, false);
+        OpenAPSSMBPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
 
         // Apply all limits
         Constraint<Double> d = constraintChecker.getMaxIOBAllowed();
         Assert.assertEquals(1.5d, d.value());
-        Assert.assertEquals(d.getReasonList().toString(),2, d.getReasonList().size());
+        Assert.assertEquals(true, d.getReasonList().size() == 4);
         Assert.assertEquals("Safety: Limiting IOB to 1.5 U because of max value in preferences", d.getMostLimitedReasons());
-
-    }
-
-    @Test
-    public void iobSMBShouldBeLimited() {
-        // No limit by default
-        when(SP.getDouble(R.string.key_openapssmb_max_iob, 3d)).thenReturn(3d);
-        when(SP.getString(R.string.key_age, "")).thenReturn("teenage");
-        OpenAPSSMBPlugin.getPlugin().setPluginEnabled(PluginType.APS, true);
-        OpenAPSAMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, false);
-        OpenAPSMAPlugin.getPlugin().setPluginEnabled(PluginType.APS, false);
-
-        // Apply all limits
-        Constraint<Double> d = constraintChecker.getMaxIOBAllowed();
-        Assert.assertEquals(3d, d.value());
-        Assert.assertEquals(d.getReasonList().toString(), 2, d.getReasonList().size());
-        Assert.assertEquals("Safety: Limiting IOB to 3.0 U because of max value in preferences", d.getMostLimitedReasons());
 
     }
 
@@ -274,13 +257,12 @@ public class ConstraintsCheckerTest {
         AAPSMocker.mockBus();
         AAPSMocker.mockStrings();
         AAPSMocker.mockSP();
-        AAPSMocker.mockCommandQueue();
 
         // RS constructor
         when(SP.getString(R.string.key_danars_address, "")).thenReturn("");
 
         //SafetyPlugin
-        when(ConfigBuilderPlugin.getPlugin().getActivePump()).thenReturn(pump);
+        when(MainApp.getConfigBuilder().getActivePump()).thenReturn(pump);
 
         constraintChecker = new ConstraintChecker(mainApp);
 

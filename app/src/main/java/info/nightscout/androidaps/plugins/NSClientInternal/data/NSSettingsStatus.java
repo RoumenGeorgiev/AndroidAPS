@@ -1,8 +1,5 @@
 package info.nightscout.androidaps.plugins.NSClientInternal.data;
 
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Bundle;
 import android.support.annotation.Nullable;
 
 import org.json.JSONException;
@@ -12,16 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.Objects;
-
-import info.nightscout.androidaps.Config;
-import info.nightscout.androidaps.MainApp;
-import info.nightscout.androidaps.R;
-import info.nightscout.androidaps.logging.L;
-import info.nightscout.androidaps.plugins.Overview.OverviewPlugin;
-import info.nightscout.androidaps.plugins.Overview.events.EventDismissNotification;
-import info.nightscout.androidaps.plugins.Overview.events.EventNewNotification;
-import info.nightscout.androidaps.plugins.Overview.notifications.Notification;
-import info.nightscout.androidaps.logging.BundleLogger;
 
 /*
  {
@@ -114,7 +101,7 @@ import info.nightscout.androidaps.logging.BundleLogger;
  }
  */
 public class NSSettingsStatus {
-    private Logger log = LoggerFactory.getLogger(L.NSCLIENT);
+    private static Logger log = LoggerFactory.getLogger(NSSettingsStatus.class);
 
     private static NSSettingsStatus instance = null;
 
@@ -124,8 +111,6 @@ public class NSSettingsStatus {
         return instance;
     }
 
-    public String nightscoutVersionName = "";
-
     private JSONObject data = null;
 
     public NSSettingsStatus() {
@@ -134,59 +119,6 @@ public class NSSettingsStatus {
     public NSSettingsStatus setData(JSONObject obj) {
         this.data = obj;
         return this;
-    }
-
-    public void handleNewData(Intent intent) {
-        Bundle bundle = intent.getExtras();
-        if (bundle == null) return;
-
-        if (L.isEnabled(L.NSCLIENT))
-            log.debug("Got NS status: " + BundleLogger.log(bundle));
-
-        if (bundle.containsKey("nsclientversioncode")) {
-
-            Integer nightscoutVersionCode = bundle.getInt("nightscoutversioncode");
-            nightscoutVersionName = bundle.getString("nightscoutversionname");
-            Integer nsClientVersionCode = bundle.getInt("nsclientversioncode");
-            String nsClientVersionName = bundle.getString("nsclientversionname");
-            if (L.isEnabled(L.NSCLIENT))
-                log.debug("Got versions: NSClient: " + nsClientVersionName + " Nightscout: " + nightscoutVersionName);
-            try {
-                if (nsClientVersionCode < MainApp.instance().getPackageManager().getPackageInfo(MainApp.instance().getPackageName(), 0).versionCode) {
-                    Notification notification = new Notification(Notification.OLD_NSCLIENT, MainApp.gs(R.string.unsupportedclientver), Notification.URGENT);
-                    MainApp.bus().post(new EventNewNotification(notification));
-                } else {
-                    MainApp.bus().post(new EventDismissNotification(Notification.OLD_NSCLIENT));
-                }
-            } catch (PackageManager.NameNotFoundException e) {
-                log.error("Unhandled exception", e);
-            }
-            if (nightscoutVersionCode < Config.SUPPORTEDNSVERSION) {
-                Notification notification = new Notification(Notification.OLD_NS, MainApp.gs(R.string.unsupportednsversion), Notification.NORMAL);
-                MainApp.bus().post(new EventNewNotification(notification));
-            } else {
-                MainApp.bus().post(new EventDismissNotification(Notification.OLD_NS));
-            }
-        } else {
-            Notification notification = new Notification(Notification.OLD_NSCLIENT, MainApp.gs(R.string.unsupportedclientver), Notification.URGENT);
-            MainApp.bus().post(new EventNewNotification(notification));
-        }
-        if (bundle.containsKey("status")) {
-            try {
-                JSONObject statusJson = new JSONObject(bundle.getString("status"));
-                setData(statusJson);
-                if (L.isEnabled(L.NSCLIENT))
-                    log.debug("Received status: " + statusJson.toString());
-                Double targetHigh = getThreshold("bgTargetTop");
-                Double targetlow = getThreshold("bgTargetBottom");
-                if (targetHigh != null)
-                    OverviewPlugin.bgTargetHigh = targetHigh;
-                if (targetlow != null)
-                    OverviewPlugin.bgTargetLow = targetlow;
-            } catch (JSONException e) {
-                log.error("Unhandled exception", e);
-            }
-        }
     }
 
     public String getName() {
@@ -202,7 +134,7 @@ public class NSSettingsStatus {
     }
 
     public Date getServerTime() {
-        return getDateOrNull("serverTime");
+        return getDateOrNull("versionNum");
     }
 
     public boolean getApiEnabled() {
@@ -270,11 +202,13 @@ public class NSSettingsStatus {
                 if (settingsO.has("thresholds")) {
                     JSONObject tObject = settingsO.getJSONObject("thresholds");
                     if (tObject.has(what)) {
-                        return tObject.getDouble(what);
+                        Double result = tObject.getDouble(what);
+                        return result;
                     }
                 }
                 if (settingsO.has("alarmTimeagoWarnMins") && Objects.equals(what, "alarmTimeagoWarnMins")) {
-                    return settingsO.getDouble(what);
+                    Double result = settingsO.getDouble(what);
+                    return result;
                 }
             }
         } catch (JSONException e) {

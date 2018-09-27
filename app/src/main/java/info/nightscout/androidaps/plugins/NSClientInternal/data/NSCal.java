@@ -5,10 +5,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
-
 public class NSCal {
-    private static Logger log = LoggerFactory.getLogger(L.NSCLIENT);
+    private static Logger log = LoggerFactory.getLogger(NSCal.class);
     public long date;
     public double slope;
     public double intercept;
@@ -22,7 +20,7 @@ public class NSCal {
             scale = json.getDouble("scale");
         } catch (JSONException e) {
             log.error("Unhandled exception", e);
-            log.error("Data: " + json.toString());
+            log.debug("Data: " + json.toString());
         }
     }
 }

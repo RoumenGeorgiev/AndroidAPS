@@ -11,4 +11,7 @@ public class EventDanaRSyncStatus extends Event {
     public EventDanaRSyncStatus() {
     }
 
- }
+    EventDanaRSyncStatus(String message) {
+        this.message = message;
+    }
+}

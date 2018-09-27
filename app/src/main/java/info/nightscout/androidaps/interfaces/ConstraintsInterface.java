@@ -7,7 +7,7 @@ import info.nightscout.androidaps.data.Profile;
  */
 public interface ConstraintsInterface {
 
-    default Constraint<Boolean> isLoopInvocationAllowed(Constraint<Boolean> value) {
+    default Constraint<Boolean> isLoopInvokationAllowed(Constraint<Boolean> value) {
         return value;
     }
 
@@ -40,10 +40,6 @@ public interface ConstraintsInterface {
     }
 
     default Constraint<Double>  applyBolusConstraints(Constraint<Double>  insulin) {
-        return insulin;
-    }
-
-    default Constraint<Double>  applyExtendedBolusConstraints(Constraint<Double>  insulin) {
         return insulin;
     }
 

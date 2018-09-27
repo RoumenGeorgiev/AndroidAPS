@@ -5,7 +5,6 @@ import com.squareup.otto.Bus;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.data.Iob;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
 import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.androidaps.interfaces.InsulinInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
@@ -30,7 +29,6 @@ public abstract class InsulinOrefBasePlugin extends PluginBase implements Insuli
                 .fragmentClass(InsulinFragment.class.getName())
                 .pluginName(R.string.fastactinginsulin)
                 .shortName(R.string.insulin_shortname)
-                .visibleByDefault(false)
         );
     }
 
@@ -58,11 +56,11 @@ public abstract class InsulinOrefBasePlugin extends PluginBase implements Insuli
     }
 
     public String getNotificationPattern() {
-        return MainApp.gs(R.string.dia_too_short);
+        return MainApp.sResources.getString(R.string.dia_too_short);
     }
 
     public double getUserDefinedDia() {
-        return ProfileFunctions.getInstance().getProfile() != null ? ProfileFunctions.getInstance().getProfile().getDia() : MIN_DIA;
+        return MainApp.getConfigBuilder().getProfile() != null ? MainApp.getConfigBuilder().getProfile().getDia() : MIN_DIA;
     }
 
     public Iob iobCalcForTreatment(Treatment treatment, long time) {
@@ -100,7 +98,7 @@ public abstract class InsulinOrefBasePlugin extends PluginBase implements Insuli
         String comment = commentStandardText();
         double userDia = getUserDefinedDia();
         if (userDia < MIN_DIA) {
-            comment += "\n" + String.format(MainApp.gs(R.string.dia_too_short), userDia, MIN_DIA);
+            comment += "\n" + String.format(MainApp.sResources.getString(R.string.dia_too_short), userDia, MIN_DIA);
         }
         return comment;
     }

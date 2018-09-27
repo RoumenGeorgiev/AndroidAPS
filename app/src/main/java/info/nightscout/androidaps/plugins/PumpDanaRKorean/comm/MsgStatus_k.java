@@ -3,17 +3,15 @@ package info.nightscout.androidaps.plugins.PumpDanaRKorean.comm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 import info.nightscout.androidaps.plugins.PumpDanaR.comm.MessageBase;
 
 public class MsgStatus_k extends MessageBase {
-    private static Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgStatus_k.class);
 
     public MsgStatus_k() {
         SetCommand(0x020B);
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     public void handleMessage(byte[] bytes) {
@@ -29,7 +27,7 @@ public class MsgStatus_k extends MessageBase {
 //        }
         pump.iob = intFromBuff(bytes, 15, 2) / 100d;
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             log.debug("Daily total: " + pump.dailyTotalUnits);
             log.debug("Is extended bolus running: " + pump.isExtendedInProgress);
             log.debug("Extended bolus min: " + pump.extendedBolusMinutes);

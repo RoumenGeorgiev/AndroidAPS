@@ -7,12 +7,6 @@ package info.nightscout.utils;
 public class T {
     private long time; // in msec
 
-    public static T now() {
-        T t = new T();
-        t.time = System.currentTimeMillis();
-        return t;
-    }
-
     public static T msecs(long msec) {
         T t = new T();
         t.time = msec;
@@ -61,13 +55,5 @@ public class T {
 
     public long days() {
         return time / 24 / 60 / 60 / 1000L;
-    }
-
-    public T plus(T plus) {
-        return T.msecs(time + plus.time);
-    }
-
-    public T minus(T minus) {
-        return T.msecs(time - minus.time);
     }
 }

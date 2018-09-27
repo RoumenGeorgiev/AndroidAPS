@@ -6,11 +6,11 @@ import org.slf4j.LoggerFactory;
 import java.util.Date;
 import java.util.GregorianCalendar;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.plugins.PumpDanaR.comm.MessageBase;
 
 public class MsgSetHistoryEntry_v2 extends MessageBase {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgSetHistoryEntry_v2.class);
 
     public MsgSetHistoryEntry_v2() {
         SetCommand(0xE004);
@@ -25,7 +25,7 @@ public class MsgSetHistoryEntry_v2 extends MessageBase {
         AddParamDateTime(gtime);
         AddParamInt(param1);
         AddParamInt(param2);
-        if (L.isEnabled(L.PUMPCOMM))
+        if (Config.logDanaMessageDetail)
             log.debug("Set history entry: type: " + type + " date: " + new Date(time).toString() + " param1: " + param1 + " param2: " + param2);
     }
 
@@ -34,10 +34,9 @@ public class MsgSetHistoryEntry_v2 extends MessageBase {
         int result = intFromBuff(bytes, 0, 1);
         if (result != 1) {
             failed = true;
-            if (L.isEnabled(L.PUMPCOMM))
-                log.debug("Set history entry result: " + result + " FAILED!!!");
+            log.debug("Set history entry result: " + result + " FAILED!!!");
         } else {
-            if (L.isEnabled(L.PUMPCOMM))
+            if (Config.logDanaMessageDetail)
                 log.debug("Set history entry result: " + result);
         }
     }

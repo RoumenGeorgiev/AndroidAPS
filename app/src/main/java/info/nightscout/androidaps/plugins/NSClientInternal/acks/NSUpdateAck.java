@@ -7,16 +7,15 @@ import org.slf4j.LoggerFactory;
 
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.events.Event;
-import info.nightscout.androidaps.logging.L;
 import io.socket.client.Ack;
 
 /**
  * Created by mike on 21.02.2016.
  */
 public class NSUpdateAck extends Event implements Ack {
-    private static Logger log = LoggerFactory.getLogger(L.NSCLIENT);
+    private static Logger log = LoggerFactory.getLogger(NSUpdateAck.class);
     public boolean result = false;
-    public String _id;
+    public String _id = null;
     public String action;
     public void call(Object...args) {
         JSONObject response = (JSONObject)args[0];
@@ -30,7 +29,6 @@ public class NSUpdateAck extends Event implements Ack {
                 }
                 MainApp.bus().post(this);
             } catch (JSONException e) {
-                log.error("Unhandled exception", e);
             }
     }
 

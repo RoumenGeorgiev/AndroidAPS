@@ -1,17 +1,35 @@
 package info.nightscout.androidaps.plugins.ConfigBuilder;
 
+import android.content.Intent;
 import android.support.annotation.Nullable;
+
+import com.crashlytics.android.answers.CustomEvent;
+import com.squareup.otto.Subscribe;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 
+import info.nightscout.androidaps.BuildConfig;
+import info.nightscout.androidaps.Config;
+import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.DetailedBolusInfo;
+import info.nightscout.androidaps.data.Profile;
+import info.nightscout.androidaps.data.ProfileStore;
+import info.nightscout.androidaps.data.PumpEnactResult;
+import info.nightscout.androidaps.db.CareportalEvent;
+import info.nightscout.androidaps.db.ProfileSwitch;
+import info.nightscout.androidaps.db.Source;
+import info.nightscout.androidaps.db.TemporaryBasal;
 import info.nightscout.androidaps.events.EventAppInitialized;
+import info.nightscout.androidaps.events.EventNewBasalProfile;
+import info.nightscout.androidaps.events.EventProfileSwitchChange;
 import info.nightscout.androidaps.interfaces.APSInterface;
 import info.nightscout.androidaps.interfaces.BgSourceInterface;
+import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.interfaces.InsulinInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PluginDescription;
@@ -19,18 +37,25 @@ import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.ProfileInterface;
 import info.nightscout.androidaps.interfaces.PumpInterface;
 import info.nightscout.androidaps.interfaces.SensitivityInterface;
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.interfaces.TreatmentsInterface;
 import info.nightscout.androidaps.plugins.Insulin.InsulinOrefRapidActingPlugin;
+import info.nightscout.androidaps.plugins.Loop.APSResult;
+import info.nightscout.androidaps.plugins.Loop.LoopPlugin;
+import info.nightscout.androidaps.plugins.Overview.Dialogs.ErrorHelperActivity;
 import info.nightscout.androidaps.plugins.PumpVirtual.VirtualPumpPlugin;
-import info.nightscout.androidaps.plugins.Sensitivity.SensitivityOref0Plugin;
+import info.nightscout.androidaps.plugins.SensitivityOref0.SensitivityOref0Plugin;
+import info.nightscout.androidaps.queue.Callback;
 import info.nightscout.androidaps.queue.CommandQueue;
+import info.nightscout.utils.FabricPrivacy;
+import info.nightscout.utils.NSUpload;
 import info.nightscout.utils.SP;
+import info.nightscout.utils.ToastUtils;
 
 /**
  * Created by mike on 05.08.2016.
  */
 public class ConfigBuilderPlugin extends PluginBase {
-    private Logger log = LoggerFactory.getLogger(L.CONFIGBUILDER);
+    private static Logger log = LoggerFactory.getLogger(ConfigBuilderPlugin.class);
 
     private static ConfigBuilderPlugin configBuilderPlugin;
 
@@ -41,26 +66,32 @@ public class ConfigBuilderPlugin extends PluginBase {
     }
 
     private BgSourceInterface activeBgSource;
-    private PumpInterface activePump;
-    private ProfileInterface activeProfile;
-    private APSInterface activeAPS;
-    private InsulinInterface activeInsulin;
-    private SensitivityInterface activeSensitivity;
+    private static PumpInterface activePump;
+    private static ProfileInterface activeProfile;
+    private static TreatmentsInterface activeTreatments;
+    private static APSInterface activeAPS;
+    private static LoopPlugin activeLoop;
+    private static InsulinInterface activeInsulin;
+    private static SensitivityInterface activeSensitivity;
 
-    private ArrayList<PluginBase> pluginList;
+    static public String nightscoutVersionName = "";
+    static public Integer nightscoutVersionCode = 0;
+    static public String nsClientVersionName = "";
+    static public Integer nsClientVersionCode = 0;
 
-    private CommandQueue commandQueue = new CommandQueue();
+    private static ArrayList<PluginBase> pluginList;
+
+    private static CommandQueue commandQueue = new CommandQueue();
 
     public ConfigBuilderPlugin() {
         super(new PluginDescription()
                 .mainType(PluginType.GENERAL)
                 .fragmentClass(ConfigBuilderFragment.class.getName())
-                .showInList(true)
+                .showInList(false)
                 .alwaysEnabled(true)
-                .alwayVisible(false)
+                .alwayVisible(true)
                 .pluginName(R.string.configbuilder)
                 .shortName(R.string.configbuilder_shortname)
-                .description(R.string.description_config_builder)
         );
     }
 
@@ -81,24 +112,13 @@ public class ConfigBuilderPlugin extends PluginBase {
         pluginList = MainApp.getPluginsList();
         upgradeSettings();
         loadSettings();
-        setAlwaysEnabledPluginsEnabled();
         MainApp.bus().post(new EventAppInitialized());
-    }
-
-    private void setAlwaysEnabledPluginsEnabled() {
-        for (PluginBase plugin : pluginList) {
-            if (plugin.pluginDescription.alwaysEnabled)
-                plugin.setPluginEnabled(plugin.getType(), true);
-        }
-        storeSettings("setAlwaysEnabledPluginsEnabled");
     }
 
     public void storeSettings(String from) {
         if (pluginList != null) {
-            if (L.isEnabled(L.CONFIGBUILDER))
+            if (Config.logPrefsChange)
                 log.debug("Storing settings from: " + from);
-
-            verifySelectionInCategories();
 
             for (PluginBase p : pluginList) {
                 PluginType type = p.getType();
@@ -113,24 +133,23 @@ public class ConfigBuilderPlugin extends PluginBase {
                     }
                 }
             }
+            verifySelectionInCategories();
         }
     }
 
     private void savePref(PluginBase p, PluginType type, boolean storeVisible) {
         String settingEnabled = "ConfigBuilder_" + type.name() + "_" + p.getClass().getSimpleName() + "_Enabled";
         SP.putBoolean(settingEnabled, p.isEnabled(type));
-        if (L.isEnabled(L.CONFIGBUILDER))
-            log.debug("Storing: " + settingEnabled + ":" + p.isEnabled(type));
+        log.debug("Storing: " + settingEnabled + ":" + p.isEnabled(type));
         if (storeVisible) {
             String settingVisible = "ConfigBuilder_" + type.name() + "_" + p.getClass().getSimpleName() + "_Visible";
             SP.putBoolean(settingVisible, p.isFragmentVisible());
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Storing: " + settingVisible + ":" + p.isFragmentVisible());
+            log.debug("Storing: " + settingVisible + ":" + p.isFragmentVisible());
         }
     }
 
     private void loadSettings() {
-        if (L.isEnabled(L.CONFIGBUILDER))
+        if (Config.logPrefsChange)
             log.debug("Loading stored settings");
         for (PluginBase p : pluginList) {
             PluginType type = p.getType();
@@ -151,8 +170,7 @@ public class ConfigBuilderPlugin extends PluginBase {
         else if (p.getType() == type && (p.pluginDescription.enableByDefault || p.pluginDescription.alwaysEnabled)) {
             p.setPluginEnabled(type, true);
         }
-        if (L.isEnabled(L.CONFIGBUILDER))
-            log.debug("Loaded: " + settingEnabled + ":" + p.isEnabled(type));
+        log.debug("Loaded: " + settingEnabled + ":" + p.isEnabled(type));
         if (loadVisible) {
             String settingVisible = "ConfigBuilder_" + type.name() + "_" + p.getClass().getSimpleName() + "_Visible";
             if (SP.contains(settingVisible))
@@ -160,8 +178,7 @@ public class ConfigBuilderPlugin extends PluginBase {
             else if (p.getType() == type && p.pluginDescription.visibleByDefault) {
                 p.setFragmentVisible(type, true);
             }
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Loaded: " + settingVisible + ":" + p.isFragmentVisible());
+            log.debug("Loaded: " + settingVisible + ":" + p.isFragmentVisible());
         }
     }
 
@@ -169,11 +186,10 @@ public class ConfigBuilderPlugin extends PluginBase {
     private void upgradeSettings() {
         if (!SP.contains("ConfigBuilder_1_NSProfilePlugin_Enabled"))
             return;
-        if (L.isEnabled(L.CONFIGBUILDER))
+        if (Config.logPrefsChange)
             log.debug("Upgrading stored settings");
         for (PluginBase p : pluginList) {
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Processing " + p.getName());
+            log.debug("Processing " + p.getName());
             for (int type = 1; type < 11; type++) {
                 PluginType newType;
                 switch (type) {
@@ -228,7 +244,7 @@ public class ConfigBuilderPlugin extends PluginBase {
         }
     }
 
-    public CommandQueue getCommandQueue() {
+    public static CommandQueue getCommandQueue() {
         return commandQueue;
     }
 
@@ -240,38 +256,41 @@ public class ConfigBuilderPlugin extends PluginBase {
         return activeProfile;
     }
 
-    public InsulinInterface getActiveInsulin() {
+    public static InsulinInterface getActiveInsulin() {
         return activeInsulin;
     }
 
-    public APSInterface getActiveAPS() {
+    public static APSInterface getActiveAPS() {
         return activeAPS;
     }
 
-    public PumpInterface getActivePump() {
+    public static LoopPlugin getActiveLoop() {
+        return activeLoop;
+    }
+
+    public static PumpInterface getActivePump() {
         return activePump;
     }
 
-    public SensitivityInterface getActiveSensitivity() {
+    public static SensitivityInterface getActiveSensitivity() {
         return activeSensitivity;
     }
 
     void logPluginStatus() {
-        if (L.isEnabled(L.CONFIGBUILDER))
-            for (PluginBase p : pluginList) {
-                log.debug(p.getName() + ":" +
-                        (p.isEnabled(PluginType.GENERAL) ? " GENERAL" : "") +
-                        (p.isEnabled(PluginType.TREATMENT) ? " TREATMENT" : "") +
-                        (p.isEnabled(PluginType.SENSITIVITY) ? " SENSITIVITY" : "") +
-                        (p.isEnabled(PluginType.PROFILE) ? " PROFILE" : "") +
-                        (p.isEnabled(PluginType.APS) ? " APS" : "") +
-                        (p.isEnabled(PluginType.PUMP) ? " PUMP" : "") +
-                        (p.isEnabled(PluginType.CONSTRAINTS) ? " CONSTRAINTS" : "") +
-                        (p.isEnabled(PluginType.LOOP) ? " LOOP" : "") +
-                        (p.isEnabled(PluginType.BGSOURCE) ? " BGSOURCE" : "") +
-                        (p.isEnabled(PluginType.INSULIN) ? " INSULIN" : "")
-                );
-            }
+        for (PluginBase p : pluginList) {
+            log.debug(p.getName() + ":" +
+                    (p.isEnabled(PluginType.GENERAL) ? " GENERAL" : "") +
+                    (p.isEnabled(PluginType.TREATMENT) ? " TREATMENT" : "") +
+                    (p.isEnabled(PluginType.SENSITIVITY) ? " SENSITIVITY" : "") +
+                    (p.isEnabled(PluginType.PROFILE) ? " PROFILE" : "") +
+                    (p.isEnabled(PluginType.APS) ? " APS" : "") +
+                    (p.isEnabled(PluginType.PUMP) ? " PUMP" : "") +
+                    (p.isEnabled(PluginType.CONSTRAINTS) ? " CONSTRAINTS" : "") +
+                    (p.isEnabled(PluginType.LOOP) ? " LOOP" : "") +
+                    (p.isEnabled(PluginType.BGSOURCE) ? " BGSOURCE" : "") +
+                    (p.isEnabled(PluginType.INSULIN) ? " INSULIN" : "")
+            );
+        }
     }
 
     private void verifySelectionInCategories() {
@@ -286,8 +305,6 @@ public class ConfigBuilderPlugin extends PluginBase {
         if (activeInsulin == null) {
             activeInsulin = InsulinOrefRapidActingPlugin.getPlugin();
             InsulinOrefRapidActingPlugin.getPlugin().setPluginEnabled(PluginType.INSULIN, true);
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Defaulting InsulinOrefRapidActingPlugin");
         }
         this.setFragmentVisiblities(((PluginBase) activeInsulin).getName(), pluginsInCategory, PluginType.INSULIN);
 
@@ -297,8 +314,6 @@ public class ConfigBuilderPlugin extends PluginBase {
         if (activeSensitivity == null) {
             activeSensitivity = SensitivityOref0Plugin.getPlugin();
             SensitivityOref0Plugin.getPlugin().setPluginEnabled(PluginType.SENSITIVITY, true);
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Defaulting SensitivityOref0Plugin");
         }
         this.setFragmentVisiblities(((PluginBase) activeSensitivity).getName(), pluginsInCategory, PluginType.SENSITIVITY);
 
@@ -314,12 +329,14 @@ public class ConfigBuilderPlugin extends PluginBase {
         if (activePump == null) {
             activePump = VirtualPumpPlugin.getPlugin();
             VirtualPumpPlugin.getPlugin().setPluginEnabled(PluginType.PUMP, true);
-            if (L.isEnabled(L.CONFIGBUILDER))
-                log.debug("Defaulting VirtualPumpPlugin");
         }
         this.setFragmentVisiblities(((PluginBase) activePump).getName(), pluginsInCategory, PluginType.PUMP);
 
+        // PluginType.LOOP
+        activeLoop = this.determineActivePlugin(PluginType.LOOP);
+
         // PluginType.TREATMENT
+        activeTreatments = this.determineActivePlugin(PluginType.TREATMENT);
     }
 
     /**
@@ -341,7 +358,6 @@ public class ConfigBuilderPlugin extends PluginBase {
     private <T> T determineActivePlugin(PluginType pluginType) {
         ArrayList<PluginBase> pluginsInCategory;
         pluginsInCategory = MainApp.getSpecificPluginsList(pluginType);
-
         return this.determineActivePlugin(pluginsInCategory, pluginType);
     }
 
@@ -373,7 +389,7 @@ public class ConfigBuilderPlugin extends PluginBase {
 
     private void setFragmentVisiblities(String activePluginName, ArrayList<PluginBase> pluginsInCategory,
                                         PluginType pluginType) {
-        if (L.isEnabled(L.CONFIGBUILDER))
+        if (Config.logConfigBuilder)
             log.debug("Selected interface: " + activePluginName);
         for (PluginBase p : pluginsInCategory) {
             if (!p.getName().equals(activePluginName)) {
@@ -399,4 +415,243 @@ public class ConfigBuilderPlugin extends PluginBase {
         return found;
     }
 
+    /**
+     * expect absolute request and allow both absolute and percent response based on pump capabilities
+     */
+    public void applyTBRRequest(APSResult request, Profile profile, Callback callback) {
+        if (!request.tempBasalRequested) {
+            return;
+        }
+
+        PumpInterface pump = getActivePump();
+
+        request.rateConstraint = new Constraint<>(request.rate);
+        request.rate = MainApp.getConstraintChecker().applyBasalConstraints(request.rateConstraint, profile).value();
+
+        if (!pump.isInitialized()) {
+            log.debug("applyAPSRequest: " + MainApp.sResources.getString(R.string.pumpNotInitialized));
+            if (callback != null) {
+                callback.result(new PumpEnactResult().comment(MainApp.sResources.getString(R.string.pumpNotInitialized)).enacted(false).success(false)).run();
+            }
+            return;
+        }
+
+        if (pump.isSuspended()) {
+            log.debug("applyAPSRequest: " + MainApp.sResources.getString(R.string.pumpsuspended));
+            if (callback != null) {
+                callback.result(new PumpEnactResult().comment(MainApp.sResources.getString(R.string.pumpsuspended)).enacted(false).success(false)).run();
+            }
+            return;
+        }
+
+        if (Config.logCongigBuilderActions)
+            log.debug("applyAPSRequest: " + request.toString());
+
+        long now = System.currentTimeMillis();
+        TemporaryBasal activeTemp = activeTreatments.getTempBasalFromHistory(now);
+        if ((request.rate == 0 && request.duration == 0) || Math.abs(request.rate - pump.getBaseBasalRate()) < pump.getPumpDescription().basalStep) {
+            if (activeTemp != null) {
+                if (Config.logCongigBuilderActions)
+                    log.debug("applyAPSRequest: cancelTempBasal()");
+                getCommandQueue().cancelTempBasal(false, callback);
+            } else {
+                if (Config.logCongigBuilderActions)
+                    log.debug("applyAPSRequest: Basal set correctly");
+                if (callback != null) {
+                    callback.result(new PumpEnactResult().absolute(request.rate).duration(0)
+                            .enacted(false).success(true).comment(MainApp.gs(R.string.basal_set_correctly))).run();
+                }
+            }
+        } else if (activeTemp != null
+                && activeTemp.getPlannedRemainingMinutes() > 5
+                && request.duration - activeTemp.getPlannedRemainingMinutes() < 30
+                && Math.abs(request.rate - activeTemp.tempBasalConvertedToAbsolute(now, profile)) < pump.getPumpDescription().basalStep) {
+            if (Config.logCongigBuilderActions)
+                log.debug("applyAPSRequest: Temp basal set correctly");
+            if (callback != null) {
+                callback.result(new PumpEnactResult().absolute(activeTemp.tempBasalConvertedToAbsolute(now, profile))
+                        .enacted(false).success(true).duration(activeTemp.getPlannedRemainingMinutes())
+                        .comment(MainApp.gs(R.string.let_temp_basal_run))).run();
+            }
+        } else {
+            if (Config.logCongigBuilderActions)
+                log.debug("applyAPSRequest: setTempBasalAbsolute()");
+            getCommandQueue().tempBasalAbsolute(request.rate, request.duration, false, profile, callback);
+        }
+    }
+
+    public void applySMBRequest(APSResult request, Callback callback) {
+        if (!request.bolusRequested) {
+            return;
+        }
+
+        long lastBolusTime = activeTreatments.getLastBolusTime();
+        if (lastBolusTime != 0 && lastBolusTime + 3 * 60 * 1000 > System.currentTimeMillis()) {
+            log.debug("SMB requested but still in 3 min interval");
+            if (callback != null) {
+                callback.result(new PumpEnactResult()
+                        .comment(MainApp.gs(R.string.smb_frequency_exceeded))
+                        .enacted(false).success(false)).run();
+            }
+            return;
+        }
+
+        PumpInterface pump = getActivePump();
+
+        if (!pump.isInitialized()) {
+            log.debug("applySMBRequest: " + MainApp.sResources.getString(R.string.pumpNotInitialized));
+            if (callback != null) {
+                callback.result(new PumpEnactResult().comment(MainApp.sResources.getString(R.string.pumpNotInitialized)).enacted(false).success(false)).run();
+            }
+            return;
+        }
+
+        if (pump.isSuspended()) {
+            log.debug("applySMBRequest: " + MainApp.sResources.getString(R.string.pumpsuspended));
+            if (callback != null) {
+                callback.result(new PumpEnactResult().comment(MainApp.sResources.getString(R.string.pumpsuspended)).enacted(false).success(false)).run();
+            }
+            return;
+        }
+
+        if (Config.logCongigBuilderActions)
+            log.debug("applySMBRequest: " + request.toString());
+
+        // deliver SMB
+        DetailedBolusInfo detailedBolusInfo = new DetailedBolusInfo();
+        detailedBolusInfo.eventType = CareportalEvent.CORRECTIONBOLUS;
+        detailedBolusInfo.insulin = request.smb;
+        detailedBolusInfo.isSMB = true;
+        detailedBolusInfo.source = Source.USER;
+        detailedBolusInfo.deliverAt = request.deliverAt;
+        if (Config.logCongigBuilderActions)
+            log.debug("applyAPSRequest: bolus()");
+        getCommandQueue().bolus(detailedBolusInfo, callback);
+    }
+
+    @Subscribe
+    public void onProfileSwitch(EventProfileSwitchChange ignored) {
+        getCommandQueue().setProfile(getProfile(), new Callback() {
+            @Override
+            public void run() {
+                if (!result.success) {
+                    Intent i = new Intent(MainApp.instance(), ErrorHelperActivity.class);
+                    i.putExtra("soundid", R.raw.boluserror);
+                    i.putExtra("status", result.comment);
+                    i.putExtra("title", MainApp.sResources.getString(R.string.failedupdatebasalprofile));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    MainApp.instance().startActivity(i);
+                }
+                MainApp.bus().post(new EventNewBasalProfile());
+            }
+        });
+    }
+
+    public String getProfileName() {
+        return getProfileName(System.currentTimeMillis());
+    }
+
+    public String getProfileName(boolean customized) {
+        return getProfileName(System.currentTimeMillis(), customized);
+    }
+
+    public String getProfileName(long time) {
+        return getProfileName(time, true);
+    }
+
+    public String getProfileName(long time, boolean customized) {
+        ProfileSwitch profileSwitch = activeTreatments.getProfileSwitchFromHistory(time);
+        if (profileSwitch != null) {
+            if (profileSwitch.profileJson != null) {
+                return customized ? profileSwitch.getCustomizedName() : profileSwitch.profileName;
+            } else {
+                ProfileStore profileStore = activeProfile.getProfile();
+                if (profileStore != null) {
+                    Profile profile = profileStore.getSpecificProfile(profileSwitch.profileName);
+                    if (profile != null)
+                        return profileSwitch.profileName;
+                }
+            }
+        }
+        return MainApp.gs(R.string.noprofileselected);
+    }
+
+    public boolean isProfileValid(String from) {
+        return getProfile() != null && getProfile().isValid(from);
+    }
+
+    @Nullable
+    public Profile getProfile() {
+        return getProfile(System.currentTimeMillis());
+    }
+
+    public String getProfileUnits() {
+        Profile profile = getProfile();
+        return profile != null ? profile.getUnits() : Constants.MGDL;
+    }
+
+    @Nullable
+    public Profile getProfile(long time) {
+        if (activeTreatments == null) {
+            log.debug("getProfile activeTreatments == null: returning null");
+            return null; //app not initialized
+        }
+        //log.debug("Profile for: " + new Date(time).toLocaleString() + " : " + getProfileName(time));
+        ProfileSwitch profileSwitch = activeTreatments.getProfileSwitchFromHistory(time);
+        if (profileSwitch != null) {
+            if (profileSwitch.profileJson != null) {
+                return profileSwitch.getProfileObject();
+            } else if (activeProfile.getProfile() != null) {
+                Profile profile = activeProfile.getProfile().getSpecificProfile(profileSwitch.profileName);
+                if (profile != null)
+                    return profile;
+            }
+        }
+        if (activeTreatments.getProfileSwitchesFromHistory().size() > 0) {
+            FabricPrivacy.getInstance().logCustom(new CustomEvent("CatchedError")
+                    .putCustomAttribute("buildversion", BuildConfig.BUILDVERSION)
+                    .putCustomAttribute("version", BuildConfig.VERSION)
+                    .putCustomAttribute("time", time)
+                    .putCustomAttribute("getProfileSwitchesFromHistory", activeTreatments.getProfileSwitchesFromHistory().toString())
+            );
+        }
+        log.debug("getProfile at the end: returning null");
+        return null;
+    }
+
+    public void disconnectPump(int durationInMinutes, Profile profile) {
+        getActiveLoop().disconnectTo(System.currentTimeMillis() + durationInMinutes * 60 * 1000L);
+        getCommandQueue().tempBasalPercent(0, durationInMinutes, true, profile, new Callback() {
+            @Override
+            public void run() {
+                if (!result.success) {
+                    ToastUtils.showToastInUiThread(MainApp.instance().getApplicationContext(), MainApp.gs(R.string.tempbasaldeliveryerror));
+                }
+            }
+        });
+        if (getActivePump().getPumpDescription().isExtendedBolusCapable && activeTreatments.isInHistoryExtendedBoluslInProgress()) {
+            getCommandQueue().cancelExtended(new Callback() {
+                @Override
+                public void run() {
+                    if (!result.success) {
+                        ToastUtils.showToastInUiThread(MainApp.instance().getApplicationContext(), MainApp.gs(R.string.extendedbolusdeliveryerror));
+                    }
+                }
+            });
+        }
+        NSUpload.uploadOpenAPSOffline(durationInMinutes);
+    }
+
+    public void suspendLoop(int durationInMinutes) {
+        getActiveLoop().suspendTo(System.currentTimeMillis() + durationInMinutes * 60 * 1000);
+        getCommandQueue().cancelTempBasal(true, new Callback() {
+            @Override
+            public void run() {
+                if (!result.success) {
+                    ToastUtils.showToastInUiThread(MainApp.instance().getApplicationContext(), MainApp.gs(R.string.tempbasaldeliveryerror));
+                }
+            }
+        });
+        NSUpload.uploadOpenAPSOffline(durationInMinutes);
+    }
 }

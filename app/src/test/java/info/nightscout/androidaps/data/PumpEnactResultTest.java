@@ -109,7 +109,7 @@ public class PumpEnactResultTest {
         Assert.assertEquals("Success: false\n" +
                 "Enacted: true\n" +
                 "Comment: AAA\n" +
-                "Insulin: 10.0 U", per.toString());
+                "SMB: 10.0 U", per.toString());
 
         per = new PumpEnactResult().enacted(true).isTempCancel(true).comment("AAA");
         Assert.assertEquals("Success: false\n" +

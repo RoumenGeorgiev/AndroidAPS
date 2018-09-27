@@ -22,8 +22,7 @@ public class InsulinOrefUltraRapidActingPlugin extends InsulinOrefBasePlugin {
     private InsulinOrefUltraRapidActingPlugin() {
         super();
         pluginDescription
-                .pluginName(R.string.ultrarapid_oref)
-                .description(R.string.description_insulin_ultra_rapid);
+                .pluginName(R.string.ultrarapid_oref);
     }
 
     @Override
@@ -33,17 +32,17 @@ public class InsulinOrefUltraRapidActingPlugin extends InsulinOrefBasePlugin {
 
     @Override
     public String getName() {
-        return MainApp.gs(R.string.ultrarapid_oref);
+        return MainApp.sResources.getString(R.string.ultrarapid_oref);
     }
 
     @Override
     public String getFriendlyName() {
-        return MainApp.gs(R.string.ultrarapid_oref);
+        return MainApp.sResources.getString(R.string.ultrarapid_oref);
     }
 
     @Override
     public String commentStandardText() {
-        return MainApp.gs(R.string.ultrafastactinginsulincomment);
+        return MainApp.sResources.getString(R.string.ultrafastactinginsulincomment);
     }
 
     @Override

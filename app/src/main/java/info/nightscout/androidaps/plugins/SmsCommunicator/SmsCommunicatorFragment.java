@@ -68,7 +68,7 @@ public class SmsCommunicatorFragment extends SubscriberFragment {
                 public void run() {
                     class CustomComparator implements Comparator<SmsCommunicatorPlugin.Sms> {
                         public int compare(SmsCommunicatorPlugin.Sms object1, SmsCommunicatorPlugin.Sms object2) {
-                            return (int) (object1.date - object2.date);
+                            return (int) (object1.date.getTime() - object2.date.getTime());
                         }
                     }
                     Collections.sort(SmsCommunicatorPlugin.getPlugin().messages, new CustomComparator());

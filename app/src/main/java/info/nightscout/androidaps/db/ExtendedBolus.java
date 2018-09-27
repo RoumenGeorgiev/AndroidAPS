@@ -9,8 +9,6 @@ import android.graphics.Color;
 import com.j256.ormlite.field.DatabaseField;
 import com.j256.ormlite.table.DatabaseTable;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,14 +19,12 @@ import info.nightscout.androidaps.data.Iob;
 import info.nightscout.androidaps.data.IobTotal;
 import info.nightscout.androidaps.interfaces.InsulinInterface;
 import info.nightscout.androidaps.interfaces.Interval;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.Overview.graphExtensions.DataPointWithLabelInterface;
 import info.nightscout.androidaps.plugins.Overview.graphExtensions.PointsWithLabelGraphSeries;
 import info.nightscout.androidaps.plugins.Treatments.Treatment;
 import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.DecimalFormatter;
-import info.nightscout.utils.JsonHelper;
 import info.nightscout.utils.Round;
 
 /**
@@ -37,7 +33,7 @@ import info.nightscout.utils.Round;
 
 @DatabaseTable(tableName = DatabaseHelper.DATABASE_EXTENDEDBOLUSES)
 public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
-    private static Logger log = LoggerFactory.getLogger(L.DATABASE);
+    private static Logger log = LoggerFactory.getLogger(ExtendedBolus.class);
 
     @DatabaseField(id = true)
     public long date;
@@ -59,7 +55,7 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
     public int durationInMinutes = 0; // duration == 0 means end of extended bolus
 
     @DatabaseField
-    public int insulinInterfaceID = InsulinInterface.OREF_RAPID_ACTING;
+    public int insulinInterfaceID = InsulinInterface.FASTACTINGINSULIN;
     @DatabaseField
     public double dia = Constants.defaultDIA;
 
@@ -68,36 +64,6 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
 
     public ExtendedBolus(long date) {
         this.date = date;
-    }
-
-    public ExtendedBolus date(long date) {
-        this.date = date;
-        return this;
-    }
-
-    public ExtendedBolus insulin(double insulin) {
-        this.insulin = insulin;
-        return this;
-    }
-
-    public ExtendedBolus pumpId(long pumpId) {
-        this.pumpId = pumpId;
-        return this;
-    }
-
-    public ExtendedBolus source(int source) {
-        this.source = source;
-        return this;
-    }
-
-    public ExtendedBolus durationInMinutes(int durationInMinutes) {
-        this.durationInMinutes = durationInMinutes;
-        return this;
-    }
-
-    public ExtendedBolus _id(String _id) {
-        this._id = _id;
-        return this;
     }
 
     public boolean isEqual(ExtendedBolus other) {
@@ -123,16 +89,6 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
         pumpId = t.pumpId;
     }
 
-    public static ExtendedBolus createFromJson(JSONObject json) {
-        ExtendedBolus extendedBolus = new ExtendedBolus()
-                .source(Source.NIGHTSCOUT)
-                .date(JsonHelper.safeGetLong(json, "mills"))
-                .durationInMinutes(JsonHelper.safeGetInt(json, "duration"))
-                .insulin(JsonHelper.safeGetDouble(json, "relative") / 60 * JsonHelper.safeGetInt(json, "duration"))
-                ._id(JsonHelper.safeGetString(json, "_id"))
-                .pumpId(JsonHelper.safeGetLong(json, "pumpId"));
-        return extendedBolus;
-    }
     // -------- Interval interface ---------
 
     Long cuttedEnd = null;
@@ -197,7 +153,7 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
     // -------- Interval interface end ---------
 
     public String log() {
-        return "ExtendedBolus{" +
+        return "Bolus{" +
                 "date= " + date +
                 ", date= " + DateUtil.dateAndTimeString(date) +
                 ", isValid=" + isValid +
@@ -218,7 +174,7 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
 
     public IobTotal iobCalc(long time) {
         IobTotal result = new IobTotal(time);
-        InsulinInterface insulinInterface = ConfigBuilderPlugin.getPlugin().getActiveInsulin();
+        InsulinInterface insulinInterface = ConfigBuilderPlugin.getActiveInsulin();
 
         int realDuration = getDurationToTime(time);
 
@@ -328,4 +284,8 @@ public class ExtendedBolus implements Interval, DataPointWithLabelInterface {
         return Color.CYAN;
     }
 
+    @Override
+    public int getSecondColor() {
+        return 0;
+    }
 }

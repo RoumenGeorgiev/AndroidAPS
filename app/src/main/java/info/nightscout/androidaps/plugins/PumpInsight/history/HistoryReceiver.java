@@ -11,7 +11,13 @@ import info.nightscout.androidaps.R;
 import static info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver.Status.BUSY;
 import static info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver.Status.SYNCED;
 import static info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver.Status.SYNCING;
-import static sugar.free.sightparser.handling.HistoryBroadcast.*;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_BOLUS_DELIVERED;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_BOLUS_PROGRAMMED;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_END_OF_TBR;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_PUMP_STATUS_CHANGED;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_STILL_SYNCING;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_SYNC_FINISHED;
+import static sugar.free.sightparser.handling.HistoryBroadcast.ACTION_SYNC_STARTED;
 
 /**
  * Created by jamorham on 27/01/2018.
@@ -39,20 +45,18 @@ public class HistoryReceiver {
         filter.addAction(ACTION_BOLUS_PROGRAMMED);
         filter.addAction(ACTION_BOLUS_DELIVERED);
         filter.addAction(ACTION_END_OF_TBR);
-        filter.addAction(ACTION_DAILY_TOTAL);
         filter.addAction(ACTION_SYNC_STARTED);
         filter.addAction(ACTION_STILL_SYNCING);
         filter.addAction(ACTION_SYNC_FINISHED);
-        filter.addAction(ACTION_CANNULA_FILLED);
-        filter.addAction(ACTION_CARTRIDGE_INSERTED);
-        filter.addAction(ACTION_BATTERY_INSERTED);
-        filter.addAction(ACTION_OCCURENCE_OF_ALERT);
-        filter.addAction(ACTION_PUMP_STATUS_CHANGED);
 
         MainApp.instance().registerReceiver(historyReceiver, filter);
     }
 
     // History
+
+    private static void log(String msg) {
+        android.util.Log.e("INSIGHTPUMPHR", msg);
+    }
 
     public static String getStatusString() {
         return status.toString();
@@ -75,6 +79,7 @@ public class HistoryReceiver {
                 }
 
                 switch (action) {
+
                     case ACTION_SYNC_STARTED:
                         status = SYNCING;
                         break;
@@ -89,24 +94,6 @@ public class HistoryReceiver {
                         break;
                     case ACTION_END_OF_TBR:
                         intentAdapter.processTBRIntent(intent);
-                        break;
-                    case ACTION_DAILY_TOTAL:
-                        intentAdapter.processDailyTotalIntent(intent);
-                        break;
-                    case ACTION_CANNULA_FILLED:
-                        intentAdapter.processCannulaFilledIntent(intent);
-                        break;
-                    case ACTION_CARTRIDGE_INSERTED:
-                        intentAdapter.processCartridgeInsertedIntent(intent);
-                        break;
-                    case ACTION_BATTERY_INSERTED:
-                        intentAdapter.processBatteryInsertedIntent(intent);
-                        break;
-                    case ACTION_OCCURENCE_OF_ALERT:
-                        intentAdapter.processOccurenceOfAlertIntent(intent);
-                        break;
-                    case ACTION_PUMP_STATUS_CHANGED:
-                        intentAdapter.processPumpStatusChangedIntent(intent);
                         break;
                 }
             }
@@ -127,7 +114,7 @@ public class HistoryReceiver {
 
         @Override
         public String toString() {
-            return MainApp.gs(string_id);
+            return MainApp.instance().getString(string_id);
         }
     }
 

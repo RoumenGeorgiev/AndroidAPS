@@ -15,8 +15,6 @@ import info.nightscout.androidaps.events.EventRefreshOverview;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PluginDescription;
 import info.nightscout.androidaps.interfaces.PluginType;
-import info.nightscout.androidaps.logging.L;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
 import info.nightscout.androidaps.plugins.Overview.events.EventDismissNotification;
 import info.nightscout.androidaps.plugins.Overview.events.EventNewNotification;
 import info.nightscout.androidaps.plugins.Overview.notifications.NotificationStore;
@@ -26,7 +24,7 @@ import info.nightscout.utils.SP;
  * Created by mike on 05.08.2016.
  */
 public class OverviewPlugin extends PluginBase {
-    private static Logger log = LoggerFactory.getLogger(L.OVERVIEW);
+    private static Logger log = LoggerFactory.getLogger(OverviewPlugin.class);
 
     private static OverviewPlugin overviewPlugin = new OverviewPlugin();
 
@@ -52,7 +50,6 @@ public class OverviewPlugin extends PluginBase {
                 .pluginName(R.string.overview)
                 .shortName(R.string.overview_shortname)
                 .preferencesId(R.xml.pref_overview)
-                .description(R.string.description_overview)
         );
         String storedData = SP.getString("QuickWizard", "[]");
         try {
@@ -93,7 +90,7 @@ public class OverviewPlugin extends PluginBase {
     }
 
     public double determineLowLine() {
-        Profile profile = ProfileFunctions.getInstance().getProfile();
+        Profile profile = MainApp.getConfigBuilder().getProfile();
         if (profile == null) {
             return bgTargetLow;
         }

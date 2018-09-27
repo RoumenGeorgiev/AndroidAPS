@@ -5,13 +5,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import info.nightscout.androidaps.BuildConfig;
 import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.PumpInterface;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.Maintenance.LoggerUtils;
 import info.nightscout.androidaps.plugins.Overview.OverviewPlugin;
 
 
@@ -56,6 +55,11 @@ public class MainAppTest {
     }
 
     @Test
+    public void getConfigBuilderTest() {
+        Assert.assertNotNull(mainApp.getConfigBuilder());
+    }
+
+    @Test
     public void getConstraintCheckerTest() {
         Assert.assertNotNull(mainApp.getConstraintChecker());
     }
@@ -69,10 +73,10 @@ public class MainAppTest {
     public void getSpecificPluginsListTest() {
         // currently MDI, VP, R, Rv2, KoreanR, RS
         int expected;
-        if (Config.NSCLIENT)
+        if (Config.NSCLIENT || Config.G5UPLOADER)
             expected = 1; // VirtualPump only
         else
-            expected = 7;
+            expected = 6;
         Assert.assertEquals(expected, mainApp.getSpecificPluginsList(PluginType.PUMP).size());
     }
 
@@ -80,10 +84,10 @@ public class MainAppTest {
     public void getSpecificPluginsVisibleInListTest() {
         // currently MDI, VP, R, Rv2, KoreanR, RS
         int expected;
-        if (Config.NSCLIENT)
+        if (Config.NSCLIENT || Config.G5UPLOADER)
             expected = 1; // VirtualPump only
         else
-            expected = 7;
+            expected = 6;
         Assert.assertEquals(expected, mainApp.getSpecificPluginsVisibleInList(PluginType.PUMP).size());
     }
 
@@ -91,10 +95,10 @@ public class MainAppTest {
     public void getSpecificPluginsListByInterfaceTest() {
         // currently MDI, VP, R, Rv2, KoreanR, RS
         int expected;
-        if (Config.NSCLIENT)
+        if (Config.NSCLIENT || Config.G5UPLOADER)
             expected = 1; // VirtualPump only
         else
-            expected = 7;
+            expected = 6;
         Assert.assertEquals(expected, mainApp.getSpecificPluginsListByInterface(PumpInterface.class).size());
     }
 
@@ -102,10 +106,10 @@ public class MainAppTest {
     public void getSpecificPluginsVisibleInListByInterfaceTest() {
         // currently MDI, VP, R, Rv2, KoreanR, RS
         int expected;
-        if (Config.NSCLIENT)
+        if (Config.NSCLIENT || Config.G5UPLOADER)
             expected = 1; // VirtualPump only
         else
-            expected = 7;
+            expected = 6;
         Assert.assertEquals(expected, mainApp.getSpecificPluginsVisibleInListByInterface(PumpInterface.class, PluginType.PUMP).size());
     }
 
@@ -117,13 +121,13 @@ public class MainAppTest {
 
     @Test
     public void isEngineeringModeOrReleaseTest() {
-        Assert.assertEquals(!Config.APS, mainApp.isEngineeringModeOrRelease());
+        Assert.assertEquals(!BuildConfig.APS, mainApp.isEngineeringModeOrRelease());
     }
 
     @Test
     public void getLogDirectoryTest() {
         // logger not initialized in Roboelectric
-        Assert.assertNull(LoggerUtils.getLogDirectory());
+        Assert.assertNull(mainApp.getLogDirectory());
     }
 
 }

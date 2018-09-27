@@ -8,17 +8,16 @@ import org.slf4j.LoggerFactory;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
-import info.nightscout.androidaps.logging.L;
-import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
+import info.nightscout.androidaps.Config;
 import info.nightscout.utils.DateUtil;
 
 public class DanaRS_Packet_APS_Set_Event_History extends DanaRS_Packet {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(DanaRS_Packet_APS_Set_Event_History.class);
 
     private int type;
     private long time;
-    private int param1;
-    private int param2;
+    public int param1;
+    public int param2;
 
     public DanaRS_Packet_APS_Set_Event_History() {
         super();
@@ -32,9 +31,7 @@ public class DanaRS_Packet_APS_Set_Event_History extends DanaRS_Packet {
         this.time = time;
         this.param1 = param1;
         this.param2 = param2;
-        if ((type == DanaRPump.CARBS || type == DanaRPump.BOLUS) && param1 <= 0)
-            this.param1 = 0;
-        if (L.isEnabled(L.PUMPCOMM))
+        if (Config.logDanaMessageDetail)
             log.debug("Set history entry: " + DateUtil.dateAndTimeString(time) + " type: " + type + " param1: " + param1 + " param2: " + param2);
     }
 
@@ -69,10 +66,9 @@ public class DanaRS_Packet_APS_Set_Event_History extends DanaRS_Packet {
         int result = intFromBuff(data, 0, 1);
         if (result != 0) {
             failed = true;
-            if (L.isEnabled(L.PUMPCOMM))
-                log.error("Set history entry result: " + result + " FAILED!!!");
+            log.error("Set history entry result: " + result + " FAILED!!!");
         } else {
-            if (L.isEnabled(L.PUMPCOMM))
+            if (Config.logDanaMessageDetail)
                 log.debug("Set history entry result: " + result);
         }
     }

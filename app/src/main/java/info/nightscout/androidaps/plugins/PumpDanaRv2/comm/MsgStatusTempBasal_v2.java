@@ -5,18 +5,20 @@ import android.support.annotation.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import java.util.Date;
+
+import info.nightscout.androidaps.Config;
+import info.nightscout.androidaps.MainApp;
+import info.nightscout.androidaps.db.TemporaryBasal;
+import info.nightscout.androidaps.interfaces.TreatmentsInterface;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 import info.nightscout.androidaps.plugins.PumpDanaR.comm.MessageBase;
-import info.nightscout.utils.DateUtil;
 
 public class MsgStatusTempBasal_v2 extends MessageBase {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgStatusTempBasal_v2.class);
 
     public MsgStatusTempBasal_v2() {
         SetCommand(0x0205);
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     public void handleMessage(byte[] bytes) {
@@ -30,7 +32,7 @@ public class MsgStatusTempBasal_v2 extends MessageBase {
         else tempBasalTotalSec = intFromBuff(bytes, 2, 1) * 60 * 60;
         int tempBasalRunningSeconds = intFromBuff(bytes, 3, 3);
         int tempBasalRemainingMin = (tempBasalTotalSec - tempBasalRunningSeconds) / 60;
-        long tempBasalStart = isTempBasalInProgress ? getDateFromTempBasalSecAgo(tempBasalRunningSeconds) : 0;
+        Date tempBasalStart = isTempBasalInProgress ? getDateFromTempBasalSecAgo(tempBasalRunningSeconds) : new Date(0);
 
         DanaRPump pump = DanaRPump.getInstance();
         pump.isTempBasalInProgress = isTempBasalInProgress;
@@ -39,19 +41,19 @@ public class MsgStatusTempBasal_v2 extends MessageBase {
         pump.tempBasalTotalSec = tempBasalTotalSec;
         pump.tempBasalStart = tempBasalStart;
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             log.debug("Is temp basal running: " + isTempBasalInProgress);
             log.debug("Is APS temp basal running: " + isAPSTempBasalInProgress);
             log.debug("Current temp basal percent: " + tempBasalPercent);
             log.debug("Current temp basal remaining min: " + tempBasalRemainingMin);
             log.debug("Current temp basal total sec: " + tempBasalTotalSec);
-            log.debug("Current temp basal start: " + DateUtil.dateAndTimeFullString(tempBasalStart));
+            log.debug("Current temp basal start: " + tempBasalStart);
         }
     }
 
     @NonNull
-    private long getDateFromTempBasalSecAgo(int tempBasalAgoSecs) {
-        return (long) (Math.ceil(System.currentTimeMillis() / 1000d) - tempBasalAgoSecs) * 1000;
+    private Date getDateFromTempBasalSecAgo(int tempBasalAgoSecs) {
+        return new Date((long) (Math.ceil(System.currentTimeMillis() / 1000d) - tempBasalAgoSecs) * 1000);
     }
 
 }

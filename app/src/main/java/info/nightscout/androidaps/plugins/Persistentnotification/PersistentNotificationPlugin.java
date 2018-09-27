@@ -1,7 +1,6 @@
 package info.nightscout.androidaps.plugins.Persistentnotification;
 
 import android.annotation.SuppressLint;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -15,7 +14,6 @@ import android.support.v4.app.TaskStackBuilder;
 
 import com.squareup.otto.Subscribe;
 
-import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainActivity;
 import info.nightscout.androidaps.MainApp;
@@ -37,8 +35,6 @@ import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PluginDescription;
 import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
-import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.utils.DecimalFormatter;
 
@@ -48,16 +44,9 @@ import info.nightscout.utils.DecimalFormatter;
 
 public class PersistentNotificationPlugin extends PluginBase {
 
-    private static PersistentNotificationPlugin plugin;
-
-    public static PersistentNotificationPlugin getPlugin() {
-        if (plugin == null) plugin = new PersistentNotificationPlugin(MainApp.instance());
-        return plugin;
-    }
-
     public static final String CHANNEL_ID = "AndroidAPS-Ongoing";
 
-    public static final int ONGOING_NOTIFICATION_ID = 4711;
+    private static final int ONGOING_NOTIFICATION_ID = 4711;
     private final Context ctx;
 
     public PersistentNotificationPlugin(Context ctx) {
@@ -66,8 +55,6 @@ public class PersistentNotificationPlugin extends PluginBase {
                 .neverVisible(true)
                 .pluginName(R.string.ongoingnotificaction)
                 .enableByDefault(true)
-                .alwaysEnabled(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                .description(R.string.description_persistent_notification)
         );
         this.ctx = ctx;
     }
@@ -76,7 +63,7 @@ public class PersistentNotificationPlugin extends PluginBase {
     protected void onStart() {
         MainApp.bus().register(this);
         createNotificationChannel();
-        triggerNotificationUpdate();
+        updateNotification();
         super.onStart();
     }
 
@@ -95,23 +82,21 @@ public class PersistentNotificationPlugin extends PluginBase {
     @Override
     protected void onStop() {
         MainApp.bus().unregister(this);
-        MainApp.instance().stopService(new Intent(MainApp.instance(), DummyService.class));
+        NotificationManager mNotificationManager =
+                (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationManager.cancel(ONGOING_NOTIFICATION_ID);
     }
 
-    private void triggerNotificationUpdate() {
-        MainApp.instance().startService(new Intent(MainApp.instance(), DummyService.class));
-    }
-
-    Notification updateNotification() {
+    private void updateNotification() {
         if (!isEnabled(PluginType.GENERAL)) {
-            return null;
+            return;
         }
 
-        String line1 = "";
+        String line1 = ctx.getString(R.string.noprofile);
 
-        if (ConfigBuilderPlugin.getPlugin().getActiveProfileInterface() == null || !ProfileFunctions.getInstance().isProfileValid("Notificiation"))
-            return null;
-        String units = ProfileFunctions.getInstance().getProfileUnits();
+        if (MainApp.getConfigBuilder().getActiveProfileInterface() == null || !MainApp.getConfigBuilder().isProfileValid("Notificiation"))
+            return;
+        String units = MainApp.getConfigBuilder().getProfileUnits();
 
 
         BgReading lastBG = DatabaseHelper.lastBg();
@@ -124,11 +109,9 @@ public class PersistentNotificationPlugin extends PluginBase {
                         + " avgΔ" + deltastring(glucoseStatus.avgdelta, glucoseStatus.avgdelta * Constants.MGDL_TO_MMOLL, units);
             } else {
                 line1 += " " +
-                        MainApp.gs(R.string.old_data) +
+                        ctx.getString(R.string.old_data) +
                         " ";
             }
-        } else {
-            line1 = MainApp.gs(R.string.missed_bg_readings);
         }
 
         TemporaryBasal activeTemp = TreatmentsPlugin.getPlugin().getTempBasalFromHistory(System.currentTimeMillis());
@@ -142,28 +125,23 @@ public class PersistentNotificationPlugin extends PluginBase {
         IobTotal bolusIob = TreatmentsPlugin.getPlugin().getLastCalculationTreatments().round();
         IobTotal basalIob = TreatmentsPlugin.getPlugin().getLastCalculationTempBasals().round();
 
+        String line2 = ctx.getString(R.string.treatments_iob_label_string) + " " + DecimalFormatter.to2Decimal(bolusIob.iob + basalIob.basaliob) + "U ("
+                + ctx.getString(R.string.bolus) + ": " + DecimalFormatter.to2Decimal(bolusIob.iob) + "U "
+                + ctx.getString(R.string.basal) + ": " + DecimalFormatter.to2Decimal(basalIob.basaliob) + "U)";
 
-        String line2 = MainApp.gs(R.string.treatments_iob_label_string) + " " +  DecimalFormatter.to2Decimal(bolusIob.iob + basalIob.basaliob) + "U " + MainApp.gs(R.string.cob)+": " + IobCobCalculatorPlugin.getPlugin().getCobInfo(false, "PersistentNotificationPlugin").generateCOBString();;
-        
-        String line3 = DecimalFormatter.to2Decimal(ConfigBuilderPlugin.getPlugin().getActivePump().getBaseBasalRate()) + " U/h";
+
+        String line3 = DecimalFormatter.to2Decimal(ConfigBuilderPlugin.getActivePump().getBaseBasalRate()) + " U/h";
 
 
-        line3 += " - " + ProfileFunctions.getInstance().getProfileName();
+        line3 += " - " + MainApp.getConfigBuilder().getProfileName();
 
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID);
         builder.setOngoing(true);
-        builder.setOnlyAlertOnce(true);
         builder.setCategory(NotificationCompat.CATEGORY_STATUS);
-        if (Config.NSCLIENT){
-            builder.setSmallIcon(R.drawable.nsclient_smallicon);
-            Bitmap largeIcon = BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.yellowowl);
-            builder.setLargeIcon(largeIcon);
-        } else {
-            builder.setSmallIcon(R.drawable.ic_notification);
-            Bitmap largeIcon = BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.blueowl);
-            builder.setLargeIcon(largeIcon);
-        }
+        builder.setSmallIcon(R.drawable.ic_notification);
+        Bitmap largeIcon = BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.blueowl);
+        builder.setLargeIcon(largeIcon);
         builder.setContentTitle(line1);
         builder.setContentText(line2);
         builder.setSubText(line3);
@@ -184,7 +162,7 @@ public class PersistentNotificationPlugin extends PluginBase {
 
         android.app.Notification notification = builder.build();
         mNotificationManager.notify(ONGOING_NOTIFICATION_ID, notification);
-        return notification;
+
     }
 
     private String deltastring(double deltaMGDL, double deltaMMOL, String units) {
@@ -206,42 +184,42 @@ public class PersistentNotificationPlugin extends PluginBase {
 
     @Subscribe
     public void onStatusEvent(final EventPreferenceChange ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventTreatmentChange ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventTempBasalChange ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventExtendedBolusChange ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventNewBG ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventNewBasalProfile ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventInitializationChanged ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
     @Subscribe
     public void onStatusEvent(final EventRefreshOverview ev) {
-        triggerNotificationUpdate();
+        updateNotification();
     }
 
 }

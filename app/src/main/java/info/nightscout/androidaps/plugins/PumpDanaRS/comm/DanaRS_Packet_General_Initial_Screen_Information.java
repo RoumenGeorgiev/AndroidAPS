@@ -1,30 +1,25 @@
 package info.nightscout.androidaps.plugins.PumpDanaRS.comm;
 
-import com.cozmo.danar.util.BleCommandUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
+
+import com.cozmo.danar.util.BleCommandUtil;
+
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 
 public class DanaRS_Packet_General_Initial_Screen_Information extends DanaRS_Packet {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(DanaRS_Packet_Bolus_Get_Step_Bolus_Information.class);
 
     public DanaRS_Packet_General_Initial_Screen_Information() {
         super();
         type = BleCommandUtil.DANAR_PACKET__TYPE_RESPONSE;
         opCode = BleCommandUtil.DANAR_PACKET__OPCODE_REVIEW__INITIAL_SCREEN_INFORMATION;
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     @Override
     public void handleMessage(byte[] data) {
-        if (data.length < 17) {
-            failed = true;
-            return;
-        }
         DanaRPump pump = DanaRPump.getInstance();
 
         int dataIndex = DATA_START;
@@ -68,7 +63,7 @@ public class DanaRS_Packet_General_Initial_Screen_Information extends DanaRS_Pac
         dataSize = 2;
         pump.iob = byteArrayToInt(getBytes(data, dataIndex, dataSize)) / 100d;
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             log.debug("Pump suspended: " + pump.pumpSuspended);
             log.debug("Temp basal in progress: " + pump.isTempBasalInProgress);
             log.debug("Extended in progress: " + pump.isExtendedInProgress);

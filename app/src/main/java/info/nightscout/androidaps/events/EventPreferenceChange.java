@@ -12,11 +12,11 @@ public class EventPreferenceChange extends Event {
     }
 
     public EventPreferenceChange(int resourceID) {
-        changedKey = MainApp.gs(resourceID);
+        changedKey = MainApp.sResources.getString(resourceID);
     }
 
     public boolean isChanged(int id) {
-        return changedKey.equals(MainApp.gs(id));
+        return changedKey.equals(MainApp.sResources.getString(id));
     }
 
     public boolean isChanged(String id) {

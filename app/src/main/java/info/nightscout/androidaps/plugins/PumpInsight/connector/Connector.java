@@ -5,9 +5,6 @@ import android.os.PowerManager;
 
 import com.squareup.otto.Subscribe;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.HashMap;
@@ -17,8 +14,6 @@ import java.util.Map;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.events.EventFeatureRunning;
-import info.nightscout.androidaps.logging.L;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.PumpInsight.events.EventInsightUpdateGui;
 import info.nightscout.androidaps.plugins.PumpInsight.history.HistoryReceiver;
 import info.nightscout.androidaps.plugins.PumpInsight.history.LiveHistory;
@@ -36,16 +31,16 @@ import static sugar.free.sightparser.handling.SightService.COMPATIBILITY_VERSION
 
 /**
  * Created by jamorham on 23/01/2018.
- * <p>
+ *
  * Connects to SightRemote app service using SightParser library
- * <p>
+ *
  * SightRemote and SightParser created by Tebbe Ubben
- * <p>
+ *
  * Original proof of concept SightProxy by jamorham
+ *
  */
 
 public class Connector {
-    private static Logger log = LoggerFactory.getLogger(L.PUMP);
 
     // TODO connection statistics
 
@@ -67,11 +62,10 @@ public class Connector {
     private int serviceReconnects = 0;
     private StatusCallback statusCallback = new StatusCallback() {
         @Override
-        public synchronized void onStatusChange(Status status, long statusTime, long waitTime) {
+        public synchronized void onStatusChange(Status status) {
 
             if ((status != lastStatus) || (Helpers.msSince(lastStatusTime) > 2000)) {
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Status change: " + status);
+                log("Status change: " + status);
 
                 updateStatusStatistics(lastStatus, lastStatusTime);
                 lastStatus = status;
@@ -84,8 +78,7 @@ public class Connector {
 
                 MainApp.bus().post(new EventInsightUpdateGui());
             } else {
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Same status as before: " + status);
+                log("Same status as before: " + status);
             }
         }
 
@@ -94,32 +87,29 @@ public class Connector {
 
         @Override
         public synchronized void onServiceConnected() {
-            if (L.isEnabled(L.PUMP))
-                log.debug("On service connected");
+            log("On service connected");
             try {
                 final String remoteVersion = serviceConnector.getRemoteVersion();
                 if (remoteVersion.equals(COMPATIBILITY_VERSION)) {
                     serviceConnector.connect();
                 } else {
-                    log.error("PROTOCOL VERSION MISMATCH!  local: " + COMPATIBILITY_VERSION + " remote: " + remoteVersion);
-                    statusCallback.onStatusChange(Status.INCOMPATIBLE, 0, 0);
-                    compatabilityMessage = MainApp.gs(R.string.insight_incompatible_compantion_app_we_need_version) + " " + getLocalVersion();
+                    log("PROTOCOL VERSION MISMATCH!  local: " + COMPATIBILITY_VERSION + " remote: " + remoteVersion);
+                    statusCallback.onStatusChange(Status.INCOMPATIBLE);
+                    compatabilityMessage = gs(R.string.insight_incompatible_compantion_app_we_need_version) + " " + getLocalVersion();
                     serviceConnector.disconnectFromService();
 
                 }
             } catch (NullPointerException e) {
-                log.error("ERROR: null pointer when trying to connect to pump");
+                log("ERROR: null pointer when trying to connect to pump");
             }
-            statusCallback.onStatusChange(safeGetStatus(), 0, 0);
+            statusCallback.onStatusChange(safeGetStatus());
         }
 
         @Override
         public synchronized void onServiceDisconnected() {
-            if (L.isEnabled(L.PUMP))
-                log.debug("Disconnected from service");
+            log("Disconnected from service");
             if (Helpers.ratelimit("insight-automatic-reconnect", 30)) {
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Scheduling automatic service reconnection");
+                log("Scheduling automatic service reconnection");
                 Helpers.runOnUiThreadDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -157,13 +147,11 @@ public class Connector {
     }
 
     public synchronized static void connectToPump(long keep_alive) {
-        if (L.isEnabled(L.PUMP))
-            log.debug("Attempting to connect to pump.");
+        log("Attempting to connect to pump.");
         if (keep_alive > 0 && Helpers.tsl() + keep_alive > stayConnectedTill) {
             stayConnectedTime = keep_alive;
             stayConnectedTill = Helpers.tsl() + keep_alive;
-            if (L.isEnabled(L.PUMP))
-                log.debug("Staying connected till: " + Helpers.dateTimeText(stayConnectedTill));
+            log("Staying connected till: " + Helpers.dateTimeText(stayConnectedTill));
             delayedDisconnectionThread();
         }
         get().getServiceConnector().connect();
@@ -171,14 +159,16 @@ public class Connector {
 
     public static void disconnectFromPump() {
         if (Helpers.tsl() >= stayConnectedTill) {
-            if (L.isEnabled(L.PUMP))
-                log.debug("Requesting real pump disconnect");
+            log("Requesting real pump disconnect");
             get().getServiceConnector().disconnect();
         } else {
-            if (L.isEnabled(L.PUMP))
-                log.debug("Cannot disconnect as due to keep alive till: " + Helpers.dateTimeText(stayConnectedTill));
+            log("Cannot disconnect as due to keep alive till: " + Helpers.dateTimeText(stayConnectedTill));
             // TODO set a disconnection timer?
         }
+    }
+
+    static void log(String msg) {
+        android.util.Log.e("INSIGHTPUMP", msg);
     }
 
     static String getLocalVersion() {
@@ -189,35 +179,38 @@ public class Connector {
         switch (status) {
 
             case EXCHANGING_KEYS:
-                return MainApp.gs(R.string.connecting).toUpperCase();
+                return gs(R.string.connecting).toUpperCase();
             case WAITING_FOR_CODE_CONFIRMATION:
-                return MainApp.gs(R.string.insight_waiting_for_code).toUpperCase();
+                return gs(R.string.insight_waiting_for_code).toUpperCase();
             case CODE_REJECTED:
-                return MainApp.gs(R.string.insight_code_rejected).toUpperCase();
+                return gs(R.string.insight_code_rejected).toUpperCase();
             case APP_BINDING:
-                return MainApp.gs(R.string.insight_app_binding).toUpperCase();
+                return gs(R.string.insight_app_binding).toUpperCase();
             case CONNECTING:
-                return MainApp.gs(R.string.connecting).toUpperCase();
+                return gs(R.string.connecting).toUpperCase();
             case CONNECTED:
-                return MainApp.gs(R.string.connected).toUpperCase();
+                return gs(R.string.connected).toUpperCase();
             case DISCONNECTED:
-                return MainApp.gs(R.string.disconnected).toUpperCase();
+                return gs(R.string.disconnected).toUpperCase();
             case NOT_AUTHORIZED:
-                return MainApp.gs(R.string.insight_not_authorized).toUpperCase();
+                return gs(R.string.insight_not_authorized).toUpperCase();
             case INCOMPATIBLE:
-                return MainApp.gs(R.string.insight_incompatible).toUpperCase();
+                return gs(R.string.insight_incompatible).toUpperCase();
 
             default:
                 return status.toString();
         }
     }
 
+    private static String gs(int id) {
+        return MainApp.instance().getString(id);
+    }
+
     private static synchronized void extendKeepAliveIfActive() {
         if (keepAliveActive()) {
             if (Helpers.ratelimit("extend-insight-keepalive", 10)) {
                 stayConnectedTill = Helpers.tsl() + stayConnectedTime;
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Keep-alive extended until: " + Helpers.dateTimeText(stayConnectedTill));
+                log("Keep-alive extended until: " + Helpers.dateTimeText(stayConnectedTill));
             }
         }
     }
@@ -228,7 +221,7 @@ public class Connector {
 
     public static String getKeepAliveString() {
         if (keepAliveActive()) {
-            return MainApp.gs(R.string.insight_keepalive_format_string,
+            return MainApp.instance().getString(R.string.insight_keepalive_format_string,
                     stayConnectedTime / 1000, Helpers.hourMinuteSecondString(stayConnectedTill));
 
         } else {
@@ -247,8 +240,7 @@ public class Connector {
                         try {
                             while (disconnect_thread_running && keepAliveActive()) {
                                 if (Helpers.ratelimit("insight-expiry-notice", 5)) {
-                                    if (L.isEnabled(L.PUMP))
-                                        log.debug("Staying connected thread expires: " + Helpers.dateTimeText(stayConnectedTill));
+                                    log("Staying connected thread expires: " + Helpers.dateTimeText(stayConnectedTill));
                                 }
                                 try {
                                     Thread.sleep(1000);
@@ -258,12 +250,10 @@ public class Connector {
                             }
 
                             if (disconnect_thread_running) {
-                                if (L.isEnabled(L.PUMP))
-                                    log.debug("Sending the real delayed disconnect");
+                                log("Sending the real delayed disconnect");
                                 get().getServiceConnector().disconnect();
                             } else {
-                                if (L.isEnabled(L.PUMP))
-                                    log.debug("Disconnect thread already terminating");
+                                log("Disconnect thread already terminating");
                             }
                         } finally {
                             Helpers.releaseWakeLock(wl);
@@ -272,8 +262,7 @@ public class Connector {
                     }
                 }).start();
             } else {
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Disconnect thread already running");
+                log("Disconnect thread already running");
             }
         }
     }
@@ -284,8 +273,7 @@ public class Connector {
 
     public synchronized void shutdown() {
         if (instance != null) {
-            if (L.isEnabled(L.PUMP))
-                log.debug("Attempting to shut down connector");
+            log("Attempting to shut down connector");
             try {
                 disconnect_thread_running = false;
                 try {
@@ -301,17 +289,17 @@ public class Connector {
                 try {
                     instance.serviceConnector.disconnect();
                 } catch (Exception e) {
-                    log.error("Exception disconnecting: " + e);
+                    log("Exception disconnecting: " + e);
                 }
                 try {
                     instance.serviceConnector.disconnectFromService();
                 } catch (Exception e) {
-                    log.error("Excpetion disconnecting service: " + e);
+                    log("Excpetion disconnecting service: " + e);
                 }
                 instance.serviceConnector = null;
                 instance = null;
             } catch (Exception e) {
-                log.error("Exception shutting down: " + e);
+                log("Exception shutting down: " + e);
             }
         }
     }
@@ -325,8 +313,7 @@ public class Connector {
     }
 
     public synchronized void init() {
-        if (L.isEnabled(L.PUMP))
-            log.debug("Connector::init()");
+        log("Connector::init()");
         if (serviceConnector == null) {
             companionAppInstalled = isCompanionAppInstalled();
             if (companionAppInstalled) {
@@ -335,11 +322,9 @@ public class Connector {
                 serviceConnector.addStatusCallback(statusCallback);
                 serviceConnector.setConnectionCallback(connectionCallback);
                 serviceConnector.connectToService();
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Trying to connect");
+                log("Trying to connect");
             } else {
-                if (L.isEnabled(L.PUMP))
-                    log.debug("Not trying init due to missing companion app");
+                log("Not trying init due to missing companion app");
             }
         } else {
             if (!serviceConnector.isConnectedToService()) {
@@ -347,8 +332,7 @@ public class Connector {
                     serviceConnector = null;
                     init();
                 } else {
-                    if (L.isEnabled(L.PUMP))
-                        log.debug("Trying to reconnect to service (" + serviceReconnects + ")");
+                    log("Trying to reconnect to service (" + serviceReconnects + ")");
                     serviceConnector.connectToService();
                     serviceReconnects++;
                 }
@@ -400,12 +384,11 @@ public class Connector {
     public String getLastStatusMessage() {
 
         if (!companionAppInstalled) {
-            return MainApp.gs(R.string.insight_companion_app_not_installed);
+            return gs(R.string.insight_companion_app_not_installed);
         }
 
         if (!isConnected()) {
-            if (L.isEnabled(L.PUMP))
-                log.debug("Not connected to companion");
+            log("Not connected to companion");
             if (Helpers.ratelimit("insight-app-not-connected", 5)) {
                 init();
             }
@@ -415,13 +398,13 @@ public class Connector {
                     // if disconnected but previous state was incompatible
                     return compatabilityMessage;
                 } else {
-                    return MainApp.gs(R.string.insight_not_connected_to_companion_app);
+                    return gs(R.string.insight_not_connected_to_companion_app);
                 }
             }
         }
 
         if (lastStatus == null) {
-            return MainApp.gs(R.string.insight_unknown);
+            return gs(R.string.insight_unknown);
         }
 
         switch (lastStatus) {
@@ -431,16 +414,16 @@ public class Connector {
                 }
                 break;
             case INCOMPATIBLE:
-                return statusToString(lastStatus) + " " + MainApp.gs(R.string.insight_needs) + " " + getLocalVersion();
+                return statusToString(lastStatus) + " " + gs(R.string.insight_needs) + " " + getLocalVersion();
         }
         return statusToString(lastStatus);
     }
 
     public String getNiceLastStatusTime() {
         if (lastStatusTime < 1) {
-            return MainApp.gs(R.string.insight_startup_uppercase);
+            return gs(R.string.insight_startup_uppercase);
         } else {
-            return Helpers.niceTimeScalar(Helpers.msSince(lastStatusTime)) + " " + MainApp.gs(R.string.ago);
+            return Helpers.niceTimeScalar(Helpers.msSince(lastStatusTime)) + " " + gs(R.string.ago);
         }
     }
 
@@ -460,7 +443,7 @@ public class Connector {
     public void tryToGetPumpStatusAgain() {
         if (Helpers.ratelimit("insight-retry-status-request", 5)) {
             try {
-                ConfigBuilderPlugin.getPlugin().getCommandQueue().readStatus("Insight. Status missing", null);
+                MainApp.getConfigBuilder().getCommandQueue().readStatus("Insight. Status missing", null);
             } catch (NullPointerException e) {
                 //
             }
@@ -520,8 +503,7 @@ public class Connector {
             Long total = statistics.get(last);
             if (total == null) total = 0L;
             statistics.put(last, total + Helpers.msSince(since));
-            if (L.isEnabled(L.PUMP))
-                log.debug("Updated statistics for: " + last + " total: " + Helpers.niceTimeScalar(statistics.get(last)));
+            log("Updated statistics for: " + last + " total: " + Helpers.niceTimeScalar(statistics.get(last)));
             // TODO persist data
         }
     }
@@ -534,7 +516,7 @@ public class Connector {
         }
         for (Map.Entry entry : statistics.entrySet()) {
             if ((long) entry.getValue() > 1000) {
-                l.add(new StatusItem(MainApp.gs(R.string.statistics) + " " + Helpers.capitalize(entry.getKey().toString()),
+                l.add(new StatusItem(gs(R.string.statistics) + " " + Helpers.capitalize(entry.getKey().toString()),
                         new Formatter().format("%4s %12s",
                                 percentage(getEntryTime(entry), total) + "%",
                                 Helpers.niceTimeScalar(getEntryTime(entry))).toString()));
@@ -556,13 +538,11 @@ public class Connector {
                     if (SP.getBoolean("insight_preemptive_connect", true)) {
                         switch (ev.getFeature()) {
                             case WIZARD:
-                                if (L.isEnabled(L.PUMP))
-                                    log.debug("Wizard feature detected, preconnecting to pump");
+                                log("Wizard feature detected, preconnecting to pump");
                                 connectToPump(120 * 1000);
                                 break;
                             case MAIN:
-                                if (L.isEnabled(L.PUMP))
-                                    log.debug("Main feature detected, preconnecting to pump");
+                                log("Main feature detected, preconnecting to pump");
                                 connectToPump(30 * 1000);
                                 break;
                         }

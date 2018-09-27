@@ -10,7 +10,6 @@ import java.util.Date;
 
 import info.nightscout.androidaps.db.CareportalEvent;
 import info.nightscout.androidaps.db.Source;
-import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 
 /**
  * Created by mike on 29.05.2017.
@@ -18,7 +17,6 @@ import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 
 public class DetailedBolusInfo {
     public long date = System.currentTimeMillis();
-    public long lastKnownBolusTime;
     public String eventType = CareportalEvent.MEALBOLUS;
     public double insulin = 0;
     public double carbs = 0;
@@ -32,7 +30,6 @@ public class DetailedBolusInfo {
     public long pumpId = 0;                // id of record if comming from pump history (not a newly created treatment)
     public boolean isSMB = false;          // is a Super-MicroBolus
     public long deliverAt = 0;             // SMB should be delivered within 1 min from this time
-    public String notes = null;
 
     public DetailedBolusInfo copy() {
         DetailedBolusInfo n = new DetailedBolusInfo();
@@ -50,14 +47,12 @@ public class DetailedBolusInfo {
         n.pumpId = pumpId;
         n.isSMB = isSMB;
         n.deliverAt = deliverAt;
-        n.notes = notes;
         return n;
     }
 
     @Override
     public String toString() {
         return new Date(date).toLocaleString() +
-                " date: " + date +
                 " insulin: " + insulin +
                 " carbs: " + carbs +
                 " isValid: " + isValid +

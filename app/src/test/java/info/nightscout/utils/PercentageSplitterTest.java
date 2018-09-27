@@ -14,12 +14,7 @@ public class PercentageSplitterTest {
     }
 
     @Test
-    public void pureNameTestPercentageOnly() {
+    public void pureNameTest() throws Exception {
         assertEquals("Fiasp", PercentageSplitter.pureName("Fiasp(101%)"));
-    }
-
-    @Test
-    public void pureNameTestPercentageAndShift() {
-        assertEquals("Fiasp", PercentageSplitter.pureName("Fiasp (101%,2h)"));
     }
 }

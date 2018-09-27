@@ -22,10 +22,8 @@ public class CareportalPlugin extends PluginBase {
                 .mainType(PluginType.GENERAL)
                 .fragmentClass(CareportalFragment.class.getName())
                 .pluginName(R.string.careportal)
+                .alwayVisible(true)
                 .shortName(R.string.careportal_shortname)
-                .visibleByDefault(true)
-                .enableByDefault(true)
-                .description(R.string.description_careportal)
         );
     }
 

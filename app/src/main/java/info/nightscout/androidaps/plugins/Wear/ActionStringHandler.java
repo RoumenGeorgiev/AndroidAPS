@@ -1,7 +1,5 @@
 package info.nightscout.androidaps.plugins.Wear;
 
-import android.app.NotificationManager;
-import android.content.Context;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 
@@ -21,7 +19,6 @@ import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.data.DetailedBolusInfo;
 import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.BgReading;
-import info.nightscout.androidaps.db.CareportalEvent;
 import info.nightscout.androidaps.db.DatabaseHelper;
 import info.nightscout.androidaps.db.ProfileSwitch;
 import info.nightscout.androidaps.db.Source;
@@ -34,9 +31,6 @@ import info.nightscout.androidaps.interfaces.PumpInterface;
 import info.nightscout.androidaps.plugins.Actions.dialogs.FillDialog;
 import info.nightscout.androidaps.plugins.Careportal.Dialogs.NewNSTreatmentDialog;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
-import info.nightscout.androidaps.plugins.IobCobCalculator.CobInfo;
-import info.nightscout.androidaps.plugins.IobCobCalculator.IobCobCalculatorPlugin;
 import info.nightscout.androidaps.plugins.Loop.APSResult;
 import info.nightscout.androidaps.plugins.Loop.LoopPlugin;
 import info.nightscout.androidaps.plugins.Overview.events.EventDismissNotification;
@@ -46,7 +40,6 @@ import info.nightscout.androidaps.plugins.PumpDanaRKorean.DanaRKoreanPlugin;
 import info.nightscout.androidaps.plugins.PumpDanaRS.DanaRSPlugin;
 import info.nightscout.androidaps.plugins.PumpDanaRv2.DanaRv2Plugin;
 import info.nightscout.androidaps.plugins.PumpInsight.InsightPlugin;
-import info.nightscout.androidaps.plugins.Treatments.CarbsGenerator;
 import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
 import info.nightscout.androidaps.queue.Callback;
 import info.nightscout.utils.BolusWizard;
@@ -102,9 +95,9 @@ public class ActionStringHandler {
                 return;
             }
             Double insulinAfterConstraints = MainApp.getConstraintChecker().applyBolusConstraints(new Constraint<>(amount)).value();
-            rMessage += MainApp.gs(R.string.primefill) + ": " + insulinAfterConstraints + "U";
+            rMessage += MainApp.instance().getString(R.string.primefill) + ": " + insulinAfterConstraints + "U";
             if (insulinAfterConstraints - amount != 0)
-                rMessage += "\n" + MainApp.gs(R.string.constraintapllied);
+                rMessage += "\n" + MainApp.instance().getString(R.string.constraintapllied);
 
             rAction += "fill " + insulinAfterConstraints;
 
@@ -113,9 +106,9 @@ public class ActionStringHandler {
             double amount = SafeParse.stringToDouble(act[1]);
 
             Double insulinAfterConstraints = MainApp.getConstraintChecker().applyBolusConstraints(new Constraint<>(amount)).value();
-            rMessage += MainApp.gs(R.string.primefill) + ": " + insulinAfterConstraints + "U";
+            rMessage += MainApp.instance().getString(R.string.primefill) + ": " + insulinAfterConstraints + "U";
             if (insulinAfterConstraints - amount != 0)
-                rMessage += "\n" + MainApp.gs(R.string.constraintapllied);
+                rMessage += "\n" + MainApp.instance().getString(R.string.constraintapllied);
 
             rAction += "fill " + insulinAfterConstraints;
 
@@ -125,11 +118,11 @@ public class ActionStringHandler {
             int carbs = SafeParse.stringToInt(act[2]);
             Double insulinAfterConstraints = MainApp.getConstraintChecker().applyBolusConstraints(new Constraint<>(insulin)).value();
             Integer carbsAfterConstraints = MainApp.getConstraintChecker().applyCarbsConstraints(new Constraint<>(carbs)).value();
-            rMessage += MainApp.gs(R.string.bolus) + ": " + insulinAfterConstraints + "U\n";
-            rMessage += MainApp.gs(R.string.carbs) + ": " + carbsAfterConstraints + "g";
+            rMessage += MainApp.instance().getString(R.string.bolus) + ": " + insulinAfterConstraints + "U\n";
+            rMessage += MainApp.instance().getString(R.string.carbs) + ": " + carbsAfterConstraints + "g";
 
             if ((insulinAfterConstraints - insulin != 0) || (carbsAfterConstraints - carbs != 0)) {
-                rMessage += "\n" + MainApp.gs(R.string.constraintapllied);
+                rMessage += "\n" + MainApp.instance().getString(R.string.constraintapllied);
             }
             rAction += "bolus " + insulinAfterConstraints + " " + carbsAfterConstraints;
 
@@ -137,7 +130,7 @@ public class ActionStringHandler {
             ///////////////////////////////////////////////////////// TEMPTARGET
             boolean isMGDL = Boolean.parseBoolean(act[1]);
 
-            Profile profile = ProfileFunctions.getInstance().getProfile();
+            Profile profile = MainApp.getConfigBuilder().getProfile();
             if (profile == null) {
                 sendError("No profile found!");
                 return;
@@ -186,9 +179,6 @@ public class ActionStringHandler {
             }
 
         } else if ("wizard".equals(act[0])) {
-            sendError("Update APP on Watch!");
-            return;
-        } else if ("wizard2".equals(act[0])) {
             ////////////////////////////////////////////// WIZARD
             Integer carbsBeforeConstraints = SafeParse.stringToInt(act[1]);
             Integer carbsAfterConstraints = MainApp.getConstraintChecker().applyCarbsConstraints(new Constraint<>(carbsBeforeConstraints)).value();
@@ -198,15 +188,12 @@ public class ActionStringHandler {
                 return;
             }
 
-            boolean useBG = SP.getBoolean(R.string.key_wearwizard_bg, true);
-            boolean useTT = SP.getBoolean(R.string.key_wearwizard_tt, false);
-            boolean useBolusIOB = SP.getBoolean(R.string.key_wearwizard_bolusiob, true);
-            boolean useBasalIOB = SP.getBoolean(R.string.key_wearwizard_basaliob, true);
-            boolean useCOB = SP.getBoolean(R.string.key_wearwizard_cob, true);
-            boolean useTrend = SP.getBoolean(R.string.key_wearwizard_trend, false);
-            int percentage = Integer.parseInt(act[2]);
+            boolean useBG = Boolean.parseBoolean(act[2]);
+            boolean useBolusIOB = Boolean.parseBoolean(act[3]);
+            boolean useBasalIOB = Boolean.parseBoolean(act[4]);
+            int percentage = Integer.parseInt(act[5]);
 
-            Profile profile = ProfileFunctions.getInstance().getProfile();
+            Profile profile = MainApp.getConfigBuilder().getProfile();
             if (profile == null) {
                 sendError("No profile found!");
                 return;
@@ -218,18 +205,9 @@ public class ActionStringHandler {
                 return;
             }
 
-            CobInfo cobInfo = IobCobCalculatorPlugin.getPlugin().getCobInfo(false, "Wizard wear");
-            if (useCOB && (cobInfo == null ||  cobInfo.displayCob == null)) {
-                sendError("Unknown COB! BG reading missing or recent app restart?");
-                return;
-            }
-
             DecimalFormat format = new DecimalFormat("0.00");
-            DecimalFormat formatInt = new DecimalFormat("0");
             BolusWizard bolusWizard = new BolusWizard();
-            bolusWizard.doCalc(profile, useTT ? TreatmentsPlugin.getPlugin().getTempTargetFromHistory() : null,
-                    carbsAfterConstraints, useCOB?cobInfo.displayCob:0d, useBG ? bgReading.valueToUnits(profile.getUnits()) : 0d,
-                    0d, percentage, useBolusIOB, useBasalIOB, false, useTrend);
+            bolusWizard.doCalc(profile, null, carbsAfterConstraints, 0d, useBG ? bgReading.valueToUnits(profile.getUnits()) : 0d, 0d, percentage, useBolusIOB, useBasalIOB, false, false);
 
             Double insulinAfterConstraints = MainApp.getConstraintChecker().applyBolusConstraints(new Constraint<>(bolusWizard.calculatedTotalInsulin)).value();
             if (insulinAfterConstraints - bolusWizard.calculatedTotalInsulin != 0) {
@@ -254,15 +232,11 @@ public class ActionStringHandler {
             rMessage += "\n_____________";
             rMessage += "\nCalc (IC:" + DecimalFormatter.to1Decimal(bolusWizard.ic) + ", " + "ISF:" + DecimalFormatter.to1Decimal(bolusWizard.sens) + "): ";
             rMessage += "\nFrom Carbs: " + format.format(bolusWizard.insulinFromCarbs) + "U";
-            if (useCOB)
-                rMessage += "\nFrom" + formatInt.format(cobInfo.displayCob) + "g COB : " + format.format(bolusWizard.insulinFromCOB) + "U";
             if (useBG) rMessage += "\nFrom BG: " + format.format(bolusWizard.insulinFromBG) + "U";
             if (useBolusIOB)
                 rMessage += "\nBolus IOB: " + format.format(bolusWizard.insulingFromBolusIOB) + "U";
             if (useBasalIOB)
                 rMessage += "\nBasal IOB: " + format.format(bolusWizard.insulingFromBasalsIOB) + "U";
-            if (useTrend)
-                rMessage += "\nFrom 15' trend: " + format.format(bolusWizard.insulinFromTrend) + "U";
             if (percentage != 100) {
                 rMessage += "\nPercentage: " + format.format(bolusWizard.totalBeforePercentageAdjustment) + "U * " + percentage + "% -> ~" + format.format(bolusWizard.calculatedTotalInsulin) + "U";
             }
@@ -295,7 +269,7 @@ public class ActionStringHandler {
             }
 
         } else if ("tddstats".equals(act[0])) {
-            Object activePump = ConfigBuilderPlugin.getPlugin().getActivePump();
+            Object activePump = MainApp.getConfigBuilder().getActivePump();
             if (activePump != null) {
                 // check if DB up to date
                 List<TDD> dummies = new LinkedList<TDD>();
@@ -307,13 +281,13 @@ public class ActionStringHandler {
                     rMessage = "OLD DATA - ";
 
                     //if pump is not busy: try to fetch data
-                    final PumpInterface pump = ConfigBuilderPlugin.getPlugin().getActivePump();
+                    final PumpInterface pump = MainApp.getConfigBuilder().getActivePump();
                     if (pump.isBusy()) {
-                        rMessage += MainApp.gs(R.string.pumpbusy);
+                        rMessage += MainApp.instance().getString(R.string.pumpbusy);
                     } else {
                         rMessage += "trying to fetch data from pump.";
 
-                        ConfigBuilderPlugin.getPlugin().getCommandQueue().loadTDDs(new Callback() {
+                        ConfigBuilderPlugin.getCommandQueue().loadTDDs(new Callback() {
                             @Override
                             public void run() {
                                 List<TDD> dummies = new LinkedList<TDD>();
@@ -334,44 +308,6 @@ public class ActionStringHandler {
                 }
             }
 
-        } else if ("ecarbs".equals(act[0])) {
-            ////////////////////////////////////////////// ECARBS
-            int carbs = SafeParse.stringToInt(act[1]);
-            int starttime = SafeParse.stringToInt(act[2]);
-            int duration = SafeParse.stringToInt(act[3]);
-            long starttimestamp = System.currentTimeMillis() + starttime*60*1000;
-            Integer carbsAfterConstraints = MainApp.getConstraintChecker().applyCarbsConstraints(new Constraint<>(carbs)).value();
-            rMessage += MainApp.gs(R.string.carbs) + ": " + carbsAfterConstraints + "g";
-            rMessage += "\n" + MainApp.gs(R.string.time) + ": " +  DateUtil.timeString(starttimestamp);
-            rMessage += "\n" + MainApp.gs(R.string.duration) + ": " + duration + "h";
-
-
-            if ( (carbsAfterConstraints - carbs != 0)) {
-                rMessage += "\n" + MainApp.gs(R.string.constraintapllied);
-            }
-            if(carbsAfterConstraints <= 0){
-                sendError("Carbs = 0! No action taken!");
-                return;
-            }
-            rAction += "ecarbs " + carbsAfterConstraints + " " + starttimestamp + " " + duration;
-
-        } else if ("changeRequest".equals(act[0])) {
-            ////////////////////////////////////////////// CHANGE REQUEST
-            rTitle = MainApp.gs(R.string.openloop_newsuggestion);
-            rAction = "changeRequest";
-            final LoopPlugin.LastRun finalLastRun = LoopPlugin.lastRun;
-            rMessage += finalLastRun.constraintsProcessed;
-
-            WearPlugin.getPlugin().requestChangeConfirmation(rTitle, rMessage, rAction);
-            lastSentTimestamp = System.currentTimeMillis();
-            lastConfirmActionString = rAction;
-            return;
-        } else if ("cancelChangeRequest".equals(act[0])) {
-            ////////////////////////////////////////////// CANCEL CHANGE REQUEST NOTIFICATION
-            rAction = "cancelChangeRequest";
-
-            WearPlugin.getPlugin().requestNotificationCancel(rAction);
-            return;
         } else return;
 
 
@@ -383,7 +319,7 @@ public class ActionStringHandler {
 
     private static String generateTDDMessage(List<TDD> historyList, List<TDD> dummies) {
 
-        Profile profile = ProfileFunctions.getInstance().getProfile();
+        Profile profile = MainApp.getConfigBuilder().getProfile();
 
         if (profile == null) {
             return "No profile loaded :(";
@@ -398,7 +334,7 @@ public class ActionStringHandler {
 
         double refTDD = profile.baseBasalSum() * 2;
 
-        PumpInterface pump = ConfigBuilderPlugin.getPlugin().getActivePump();
+        PumpInterface pump = MainApp.getConfigBuilder().getActivePump();
         if (df.format(new Date(historyList.get(0).date)).equals(df.format(new Date()))) {
             double tdd = historyList.get(0).getTotal();
             historyList.remove(0);
@@ -447,7 +383,7 @@ public class ActionStringHandler {
     }
 
     public static boolean isOldData(List<TDD> historyList) {
-        Object activePump = ConfigBuilderPlugin.getPlugin().getActivePump();
+        Object activePump = MainApp.getConfigBuilder().getActivePump();
         PumpInterface dana = MainApp.getSpecificPlugin(DanaRPlugin.class);
         PumpInterface danaRS = MainApp.getSpecificPlugin(DanaRSPlugin.class);
         PumpInterface danaV2 = MainApp.getSpecificPlugin(DanaRv2Plugin.class);
@@ -498,28 +434,28 @@ public class ActionStringHandler {
 
     @NonNull
     private static String getPumpStatus() {
-        return ConfigBuilderPlugin.getPlugin().getActivePump().shortStatus(false);
+        return ConfigBuilderPlugin.getActivePump().shortStatus(false);
     }
 
     @NonNull
     private static String getLoopStatus() {
         String ret = "";
         // decide if enabled/disabled closed/open; what Plugin as APS?
-        final LoopPlugin loopPlugin = LoopPlugin.getPlugin();
-        if (loopPlugin.isEnabled(loopPlugin.getType())) {
+        final LoopPlugin activeloop = MainApp.getConfigBuilder().getActiveLoop();
+        if (activeloop != null && activeloop.isEnabled(activeloop.getType())) {
             if (MainApp.getConstraintChecker().isClosedLoopAllowed().value()) {
                 ret += "CLOSED LOOP\n";
             } else {
                 ret += "OPEN LOOP\n";
             }
-            final APSInterface aps = ConfigBuilderPlugin.getPlugin().getActiveAPS();
+            final APSInterface aps = MainApp.getConfigBuilder().getActiveAPS();
             ret += "APS: " + ((aps == null) ? "NO APS SELECTED!" : ((PluginBase) aps).getName());
-            if (LoopPlugin.lastRun != null) {
-                if (LoopPlugin.lastRun.lastAPSRun != null)
-                    ret += "\nLast Run: " + DateUtil.timeString(LoopPlugin.lastRun.lastAPSRun);
+            if (activeloop.lastRun != null) {
+                if (activeloop.lastRun.lastAPSRun != null)
+                    ret += "\nLast Run: " + DateUtil.timeString(activeloop.lastRun.lastAPSRun);
 
-                if (LoopPlugin.lastRun.lastEnact != null)
-                    ret += "\nLast Enact: " + DateUtil.timeString(LoopPlugin.lastRun.lastEnact);
+                if (activeloop.lastRun.lastEnact != null)
+                    ret += "\nLast Enact: " + DateUtil.timeString(activeloop.lastRun.lastEnact);
 
             }
 
@@ -537,7 +473,7 @@ public class ActionStringHandler {
         if (!Config.APS) {
             return "Targets only apply in APS mode!";
         }
-        Profile profile = ProfileFunctions.getInstance().getProfile();
+        Profile profile = MainApp.getConfigBuilder().getProfile();
         if (profile == null) {
             return "No profile set :(";
         }
@@ -561,12 +497,12 @@ public class ActionStringHandler {
         if (!Config.APS) {
             return "Only apply in APS mode!";
         }
-        Profile profile = ProfileFunctions.getInstance().getProfile();
+        Profile profile = MainApp.getConfigBuilder().getProfile();
         if (profile == null) {
             return "No profile set :(";
         }
 
-        APSInterface usedAPS = ConfigBuilderPlugin.getPlugin().getActiveAPS();
+        APSInterface usedAPS = MainApp.getConfigBuilder().getActiveAPS();
         if (usedAPS == null) {
             return "No active APS :(!";
         }
@@ -577,15 +513,15 @@ public class ActionStringHandler {
         }
 
         if (!result.isChangeRequested()) {
-            ret += MainApp.gs(R.string.nochangerequested) + "\n";
+            ret += MainApp.sResources.getString(R.string.nochangerequested) + "\n";
         } else if (result.rate == 0 && result.duration == 0) {
-            ret += MainApp.gs(R.string.canceltemp) + "\n";
+            ret += MainApp.sResources.getString(R.string.canceltemp) + "\n";
         } else {
-            ret += MainApp.gs(R.string.rate) + ": " + DecimalFormatter.to2Decimal(result.rate) + " U/h " +
-                    "(" + DecimalFormatter.to2Decimal(result.rate / ConfigBuilderPlugin.getPlugin().getActivePump().getBaseBasalRate() * 100) + "%)\n" +
-                    MainApp.gs(R.string.duration) + ": " + DecimalFormatter.to0Decimal(result.duration) + " min\n";
+            ret += MainApp.sResources.getString(R.string.rate) + ": " + DecimalFormatter.to2Decimal(result.rate) + " U/h " +
+                    "(" + DecimalFormatter.to2Decimal(result.rate / ConfigBuilderPlugin.getActivePump().getBaseBasalRate() * 100) + "%)\n" +
+                    MainApp.sResources.getString(R.string.duration) + ": " + DecimalFormatter.to0Decimal(result.duration) + " min\n";
         }
-        ret += "\n" + MainApp.gs(R.string.reason) + ": " + result.reason;
+        ret += "\n" + MainApp.sResources.getString(R.string.reason) + ": " + result.reason;
 
         return ret;
     }
@@ -624,7 +560,7 @@ public class ActionStringHandler {
                 high *= Constants.MMOLL_TO_MGDL;
             }
             generateTempTarget(duration, low, high);
-        } else if ("wizard2".equals(act[0])) {
+        } else if ("wizard".equals(act[0])) {
             //use last calculation as confirmed string matches
 
             doBolus(lastBolusWizard.calculatedTotalInsulin, lastBolusWizard.carbs);
@@ -637,31 +573,10 @@ public class ActionStringHandler {
             int timeshift = SafeParse.stringToInt(act[1]);
             int percentage = SafeParse.stringToInt(act[2]);
             setCPP(timeshift, percentage);
-        }  else if ("ecarbs".equals(act[0])) {
-            int carbs = SafeParse.stringToInt(act[1]);
-            long starttime = SafeParse.stringToLong(act[2]);
-            int duration = SafeParse.stringToInt(act[3]);
-
-            doECarbs(carbs, starttime, duration);
         } else if ("dismissoverviewnotification".equals(act[0])) {
             MainApp.bus().post(new EventDismissNotification(SafeParse.stringToInt(act[1])));
-        } else if ("changeRequest".equals(act[0])) {
-            LoopPlugin.getPlugin().acceptChangeRequest();
-            NotificationManager notificationManager =
-                    (NotificationManager) MainApp.instance().getSystemService(Context.NOTIFICATION_SERVICE);
-            notificationManager.cancel(Constants.notificationID);
         }
         lastBolusWizard = null;
-    }
-
-    private static void doECarbs(int carbs, long time, int duration) {
-        if (carbs > 0) {
-            if (duration == 0) {
-                CarbsGenerator.createCarb(carbs, time, CareportalEvent.CARBCORRECTION, "watch");
-            } else {
-                CarbsGenerator.generateCarbs(carbs, time, duration, "watch eCarbs");
-            }
-        }
     }
 
     private static void setCPP(int timeshift, int percentage) {
@@ -671,18 +586,18 @@ public class ActionStringHandler {
 
         //check for validity
         if (percentage < Constants.CPP_MIN_PERCENTAGE || percentage > Constants.CPP_MAX_PERCENTAGE) {
-            msg += String.format(MainApp.gs(R.string.valueoutofrange), "Profile-Percentage") + "\n";
+            msg += String.format(MainApp.sResources.getString(R.string.valueoutofrange), "Profile-Percentage") + "\n";
         }
         if (timeshift < 0 || timeshift > 23) {
-            msg += String.format(MainApp.gs(R.string.valueoutofrange), "Profile-Timeshift") + "\n";
+            msg += String.format(MainApp.sResources.getString(R.string.valueoutofrange), "Profile-Timeshift") + "\n";
         }
-        final Profile profile = ProfileFunctions.getInstance().getProfile();
+        final Profile profile = MainApp.getConfigBuilder().getProfile();
 
         if (profile == null) {
-            msg += MainApp.gs(R.string.notloadedplugins) + "\n";
+            msg += MainApp.sResources.getString(R.string.notloadedplugins) + "\n";
         }
         if (!"".equals(msg)) {
-            msg += MainApp.gs(R.string.valuesnotstored);
+            msg += MainApp.sResources.getString(R.string.valuesnotstored);
             String rTitle = "STATUS";
             String rAction = "statusmessage";
             WearPlugin.getPlugin().requestActionConfirmation(rTitle, msg, rAction);
@@ -707,7 +622,10 @@ public class ActionStringHandler {
         } else {
             tempTarget.low(0).high(0);
         }
-        TreatmentsPlugin.getPlugin().addToHistoryTempTarget(tempTarget);
+        MainApp.getDbHelper().createOrUpdate(tempTarget);
+
+        //TODO: Nightscout-Treatment for Temp-Target!
+        //ConfigBuilderPlugin.uploadCareportalEntryToNS(data);
     }
 
     private static void doFillBolus(final Double amount) {
@@ -715,11 +633,11 @@ public class ActionStringHandler {
         detailedBolusInfo.insulin = amount;
         detailedBolusInfo.isValid = false;
         detailedBolusInfo.source = Source.USER;
-        ConfigBuilderPlugin.getPlugin().getCommandQueue().bolus(detailedBolusInfo, new Callback() {
+        ConfigBuilderPlugin.getCommandQueue().bolus(detailedBolusInfo, new Callback() {
             @Override
             public void run() {
                 if (!result.success) {
-                    sendError(MainApp.gs(R.string.treatmentdeliveryerror) +
+                    sendError(MainApp.sResources.getString(R.string.treatmentdeliveryerror) +
                             "\n" +
                             result.comment);
                 }
@@ -732,19 +650,19 @@ public class ActionStringHandler {
         detailedBolusInfo.insulin = amount;
         detailedBolusInfo.carbs = carbs;
         detailedBolusInfo.source = Source.USER;
-        if (detailedBolusInfo.insulin > 0 || ConfigBuilderPlugin.getPlugin().getActivePump().getPumpDescription().storesCarbInfo) {
-            ConfigBuilderPlugin.getPlugin().getCommandQueue().bolus(detailedBolusInfo, new Callback() {
+        if (detailedBolusInfo.insulin > 0 || ConfigBuilderPlugin.getActivePump().getPumpDescription().storesCarbInfo) {
+            ConfigBuilderPlugin.getCommandQueue().bolus(detailedBolusInfo, new Callback() {
                 @Override
                 public void run() {
                     if (!result.success) {
-                        sendError(MainApp.gs(R.string.treatmentdeliveryerror) +
+                        sendError(MainApp.sResources.getString(R.string.treatmentdeliveryerror) +
                                 "\n" +
                                 result.comment);
                     }
                 }
             });
         } else {
-            TreatmentsPlugin.getPlugin().addToHistoryTreatment(detailedBolusInfo, false);
+            TreatmentsPlugin.getPlugin().addToHistoryTreatment(detailedBolusInfo);
         }
     }
 

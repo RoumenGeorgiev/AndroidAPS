@@ -10,12 +10,11 @@ import org.slf4j.LoggerFactory;
 
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.Round;
 
 public class PumpEnactResult {
-    private static Logger log = LoggerFactory.getLogger(L.APS);
+    private static Logger log = LoggerFactory.getLogger(PumpEnactResult.class);
 
     public boolean success = false;    // request was processed successfully (but possible no change was needed)
     public boolean enacted = false;    // request was processed successfully and change has been made
@@ -108,7 +107,7 @@ public class PumpEnactResult {
             if (bolusDelivered > 0) {
                 ret += "\n" + MainApp.gs(R.string.enacted) + ": " + enacted;
                 ret += "\n" + MainApp.gs(R.string.comment) + ": " + comment;
-                ret += "\n" + MainApp.gs(R.string.configbuilder_insulin)
+                ret += "\n" + MainApp.gs(R.string.smb_shortname)
                         + ": " + bolusDelivered + " " + MainApp.gs(R.string.insulin_unit_shortname);
             } else if (isTempCancel) {
                 ret += "\n" + MainApp.gs(R.string.enacted) + ": " + enacted;

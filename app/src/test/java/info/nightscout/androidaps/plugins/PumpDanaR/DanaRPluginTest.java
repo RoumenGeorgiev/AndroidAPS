@@ -66,7 +66,6 @@ public class DanaRPluginTest {
         AAPSMocker.mockStrings();
         AAPSMocker.mockApplicationContext();
         AAPSMocker.mockSP();
-        AAPSMocker.mockCommandQueue();
 
         when(SP.getString(R.string.key_danars_address, "")).thenReturn("");
 

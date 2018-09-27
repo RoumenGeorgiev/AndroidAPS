@@ -4,10 +4,12 @@ import java.util.ArrayList;
 
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
+import info.nightscout.androidaps.interfaces.BgSourceInterface;
 import info.nightscout.androidaps.interfaces.Constraint;
 import info.nightscout.androidaps.interfaces.ConstraintsInterface;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PluginType;
+import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 
 /**
  * Created by mike on 19.03.2018.
@@ -23,7 +25,7 @@ public class ConstraintChecker implements ConstraintsInterface {
 
 
     public Constraint<Boolean> isLoopInvokationAllowed() {
-        return isLoopInvocationAllowed(new Constraint<>(true));
+        return isLoopInvokationAllowed(new Constraint<>(true));
     }
 
     public Constraint<Boolean> isClosedLoopAllowed() {
@@ -58,10 +60,6 @@ public class ConstraintChecker implements ConstraintsInterface {
         return applyBolusConstraints(new Constraint<>(Constants.REALLYHIGHBOLUS));
     }
 
-    public Constraint<Double> getMaxExtendedBolusAllowed() {
-        return applyExtendedBolusConstraints(new Constraint<>(Constants.REALLYHIGHBOLUS));
-    }
-
     public Constraint<Integer> getMaxCarbsAllowed() {
         return applyCarbsConstraints(new Constraint<>(Constants.REALLYHIGHCARBS));
     }
@@ -71,13 +69,13 @@ public class ConstraintChecker implements ConstraintsInterface {
     }
 
     @Override
-    public Constraint<Boolean> isLoopInvocationAllowed(Constraint<Boolean> value) {
+    public Constraint<Boolean> isLoopInvokationAllowed(Constraint<Boolean> value) {
 
         ArrayList<PluginBase> constraintsPlugins = mainApp.getSpecificPluginsListByInterface(ConstraintsInterface.class);
         for (PluginBase p : constraintsPlugins) {
             ConstraintsInterface constraint = (ConstraintsInterface) p;
             if (!p.isEnabled(PluginType.CONSTRAINTS)) continue;
-            constraint.isLoopInvocationAllowed(value);
+            constraint.isLoopInvokationAllowed(value);
         }
         return value;
     }
@@ -170,17 +168,6 @@ public class ConstraintChecker implements ConstraintsInterface {
             ConstraintsInterface constrain = (ConstraintsInterface) p;
             if (!p.isEnabled(PluginType.CONSTRAINTS)) continue;
             constrain.applyBolusConstraints(insulin);
-        }
-        return insulin;
-    }
-
-    @Override
-    public Constraint<Double> applyExtendedBolusConstraints(Constraint<Double> insulin) {
-        ArrayList<PluginBase> constraintsPlugins = mainApp.getSpecificPluginsListByInterface(ConstraintsInterface.class);
-        for (PluginBase p : constraintsPlugins) {
-            ConstraintsInterface constrain = (ConstraintsInterface) p;
-            if (!p.isEnabled(PluginType.CONSTRAINTS)) continue;
-            constrain.applyExtendedBolusConstraints(insulin);
         }
         return insulin;
     }

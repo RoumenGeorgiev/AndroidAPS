@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
-import info.nightscout.androidaps.services.AlarmSoundService;
+import info.nightscout.androidaps.Services.AlarmSoundService;
 
 public class ErrorDialog extends DialogFragment implements View.OnClickListener {
     private static Logger log = LoggerFactory.getLogger(ErrorDialog.class);
@@ -74,7 +74,7 @@ public class ErrorDialog extends DialogFragment implements View.OnClickListener 
 
     @Override
     public void dismiss() {
-        super.dismissAllowingStateLoss();
+        super.dismiss();
         if (helperActivity != null) {
             helperActivity.finish();
         }

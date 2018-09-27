@@ -1,22 +1,21 @@
 package info.nightscout.androidaps.plugins.PumpDanaRS.comm;
 
 
-import com.cozmo.danar.util.BleCommandUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
+
+import com.cozmo.danar.util.BleCommandUtil;
+
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 
 public class DanaRS_Packet_Bolus_Get_CIR_CF_Array extends DanaRS_Packet {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(DanaRS_Packet_Bolus_Get_CIR_CF_Array.class);
 
     public DanaRS_Packet_Bolus_Get_CIR_CF_Array() {
         super();
         opCode = BleCommandUtil.DANAR_PACKET__OPCODE_BOLUS__GET_CIR_CF_ARRAY;
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     @Override
@@ -118,9 +117,8 @@ public class DanaRS_Packet_Bolus_Get_CIR_CF_Array extends DanaRS_Packet {
             dataSize = 2;
             pump.nightCF = byteArrayToInt(getBytes(data, dataIndex, dataSize)) / 100d;
         }
-        if (pump.units < 0 || pump.units > 1)
-            failed = true;
-        if (L.isEnabled(L.PUMPCOMM)) {
+
+        if (Config.logDanaMessageDetail) {
             log.debug("Language: " + language);
             log.debug("Pump units: " + (pump.units == DanaRPump.UNITS_MGDL ? "MGDL" : "MMOL"));
             log.debug("Current pump morning CIR: " + pump.morningCIR);

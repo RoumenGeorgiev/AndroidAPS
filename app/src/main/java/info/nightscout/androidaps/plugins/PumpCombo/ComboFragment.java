@@ -6,7 +6,6 @@ import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,6 +16,7 @@ import com.squareup.otto.Subscribe;
 
 import org.apache.commons.lang3.StringUtils;
 
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.plugins.PumpCombo.ruffyscripter.PumpState;
 import info.nightscout.androidaps.plugins.PumpCombo.ruffyscripter.history.Bolus;
 import info.nightscout.androidaps.MainApp;
@@ -29,7 +29,7 @@ import info.nightscout.androidaps.queue.events.EventQueueChanged;
 import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.SP;
 
-public class ComboFragment extends SubscriberFragment implements View.OnClickListener {
+public class ComboFragment extends SubscriberFragment implements View.OnClickListener, View.OnLongClickListener {
     private TextView stateView;
     private TextView activityView;
     private TextView batteryView;
@@ -39,27 +39,42 @@ public class ComboFragment extends SubscriberFragment implements View.OnClickLis
     private TextView baseBasalRate;
     private TextView tempBasalText;
     private Button refreshButton;
+    private Button alertsButton;
+    private Button tddsButton;
     private TextView bolusCount;
     private TextView tbrCount;
+    private Button fullHistoryButton;
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.combopump_fragment, container, false);
 
-        stateView = view.findViewById(R.id.combo_state);
-        activityView = view.findViewById(R.id.combo_activity);
-        batteryView = view.findViewById(R.id.combo_pumpstate_battery);
-        reservoirView = view.findViewById(R.id.combo_insulinstate);
-        lastBolusView = view.findViewById(R.id.combo_last_bolus);
-        lastConnectionView = view.findViewById(R.id.combo_lastconnection);
-        baseBasalRate = view.findViewById(R.id.combo_base_basal_rate);
-        tempBasalText = view.findViewById(R.id.combo_temp_basal);
-        bolusCount = view.findViewById(R.id.combo_bolus_count);
-        tbrCount = view.findViewById(R.id.combo_tbr_count);
+        stateView = (TextView) view.findViewById(R.id.combo_state);
+        activityView = (TextView) view.findViewById(R.id.combo_activity);
+        batteryView = (TextView) view.findViewById(R.id.combo_pumpstate_battery);
+        reservoirView = (TextView) view.findViewById(R.id.combo_insulinstate);
+        lastBolusView = (TextView) view.findViewById(R.id.combo_last_bolus);
+        lastConnectionView = (TextView) view.findViewById(R.id.combo_lastconnection);
+        baseBasalRate = (TextView) view.findViewById(R.id.combo_base_basal_rate);
+        tempBasalText = (TextView) view.findViewById(R.id.combo_temp_basal);
+        bolusCount = (TextView) view.findViewById(R.id.combo_bolus_count);
+        tbrCount = (TextView) view.findViewById(R.id.combo_tbr_count);
 
-        refreshButton = view.findViewById(R.id.combo_refresh_button);
+        refreshButton = (Button) view.findViewById(R.id.combo_refresh_button);
         refreshButton.setOnClickListener(this);
+
+        alertsButton = (Button) view.findViewById(R.id.combo_alerts_button);
+        alertsButton.setOnClickListener(this);
+        alertsButton.setOnLongClickListener(this);
+
+        tddsButton = (Button) view.findViewById(R.id.combo_tdds_button);
+        tddsButton.setOnClickListener(this);
+        tddsButton.setOnLongClickListener(this);
+
+        fullHistoryButton = (Button) view.findViewById(R.id.combo_full_history_button);
+        fullHistoryButton.setOnClickListener(this);
+        fullHistoryButton.setOnLongClickListener(this);
 
         updateGUI();
         return view;
@@ -77,14 +92,80 @@ public class ComboFragment extends SubscriberFragment implements View.OnClickLis
         switch (view.getId()) {
             case R.id.combo_refresh_button:
                 refreshButton.setEnabled(false);
-                ConfigBuilderPlugin.getPlugin().getCommandQueue().readStatus("User request", new Callback() {
+                ConfigBuilderPlugin.getCommandQueue().readStatus("User request", new Callback() {
                     @Override
                     public void run() {
                         runOnUiThread(() -> refreshButton.setEnabled(true));
                     }
                 });
                 break;
+            case R.id.combo_alerts_button:
+                ComboAlertHistoryDialog ehd = new ComboAlertHistoryDialog();
+                ehd.show(getFragmentManager(), ComboAlertHistoryDialog.class.getSimpleName());
+                break;
+            case R.id.combo_tdds_button:
+                ComboTddHistoryDialog thd = new ComboTddHistoryDialog();
+                thd.show(getFragmentManager(), ComboTddHistoryDialog.class.getSimpleName());
+                break;
+            case R.id.combo_full_history_button:
+                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                builder.setMessage(R.string.combo_read_full_history_info);
+                builder.show();
+                break;
         }
+    }
+
+    // TODO clean up when when queuing
+    @Override
+    public boolean onLongClick(View view) {
+        switch (view.getId()) {
+            case R.id.combo_alerts_button:
+                alertsButton.setEnabled(false);
+                tddsButton.setEnabled(false);
+                fullHistoryButton.setEnabled(false);
+                new Thread(() -> ComboPlugin.getPlugin().readAlertData(new Callback() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(() -> {
+                            alertsButton.setEnabled(true);
+                            tddsButton.setEnabled(true);
+                            fullHistoryButton.setEnabled(true);
+                        });
+                    }
+                })).start();
+                return true;
+            case R.id.combo_tdds_button:
+                alertsButton.setEnabled(false);
+                tddsButton.setEnabled(false);
+                fullHistoryButton.setEnabled(false);
+                new Thread(() -> ComboPlugin.getPlugin().readTddData(new Callback() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(() -> {
+                            alertsButton.setEnabled(true);
+                            tddsButton.setEnabled(true);
+                            fullHistoryButton.setEnabled(true);
+                        });
+                    }
+                })).start();
+                return true;
+            case R.id.combo_full_history_button:
+                alertsButton.setEnabled(false);
+                tddsButton.setEnabled(false);
+                fullHistoryButton.setEnabled(false);
+                new Thread(() -> ComboPlugin.getPlugin().readAllPumpData(new Callback() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(() -> {
+                            alertsButton.setEnabled(true);
+                            tddsButton.setEnabled(true);
+                            fullHistoryButton.setEnabled(true);
+                        });
+                    }
+                })).start();
+                return true;
+        }
+        return false;
     }
 
     @Subscribe
@@ -120,25 +201,22 @@ public class ComboFragment extends SubscriberFragment implements View.OnClickLis
 
             // activity
             String activity = plugin.getPump().activity;
-            if (activity != null) {
-                activityView.setTextColor(Color.WHITE);
+            if (StringUtils.isNotEmpty(activity)) {
                 activityView.setTextSize(14);
                 activityView.setText(activity);
-            } else if (ConfigBuilderPlugin.getPlugin().getCommandQueue().size() > 0) {
-                activityView.setTextColor(Color.WHITE);
-                activityView.setTextSize(14);
-                activityView.setText("");
-            } else if (plugin.isInitialized()){
-                activityView.setTextColor(Color.WHITE);
+            } else {
                 activityView.setTextSize(20);
                 activityView.setText("{fa-bed}");
-            } else {
-                activityView.setTextColor(Color.RED);
-                activityView.setTextSize(14);
-                activityView.setText(MainApp.gs(R.string.pump_unreachable));
             }
 
             if (plugin.isInitialized()) {
+                refreshButton.setVisibility(View.VISIBLE);
+                if (Config.enableComboBetaFeatures) {
+                    alertsButton.setVisibility(View.VISIBLE);
+                    tddsButton.setVisibility(View.VISIBLE);
+                }
+                fullHistoryButton.setVisibility(View.VISIBLE);
+
                 // battery
                 batteryView.setTextSize(20);
                 if (ps.batteryState == PumpState.EMPTY) {
@@ -155,7 +233,7 @@ public class ComboFragment extends SubscriberFragment implements View.OnClickLis
                 // reservoir
                 int reservoirLevel = plugin.getPump().reservoirLevel;
                 if (reservoirLevel != -1) {
-                    reservoirView.setText(reservoirLevel + " " + MainApp.gs(R.string.insulin_unit_shortname));
+                    reservoirView.setText(reservoirLevel + " " + MainApp.sResources.getString(R.string.insulin_unit_shortname));
                 } else if (ps.insulinState == PumpState.LOW) {
                     reservoirView.setText(MainApp.gs(R.string.combo_reservoir_low));
                 } else if (ps.insulinState == PumpState.EMPTY) {

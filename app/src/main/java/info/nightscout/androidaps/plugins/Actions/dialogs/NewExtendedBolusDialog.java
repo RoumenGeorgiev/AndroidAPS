@@ -12,7 +12,6 @@ import android.view.ViewGroup;
 
 import com.crashlytics.android.answers.CustomEvent;
 
-import org.mozilla.javascript.tools.jsc.Main;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,16 +39,16 @@ public class NewExtendedBolusDialog extends DialogFragment implements View.OnCli
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        getDialog().setTitle(MainApp.gs(R.string.overview_extendedbolus_button));
+        getDialog().setTitle(getString(R.string.overview_extendedbolus_button));
 
         View view = inflater.inflate(R.layout.overview_newextendedbolus_dialog, container, false);
 
-        Double maxInsulin = MainApp.getConstraintChecker().getMaxExtendedBolusAllowed().value();
+        Double maxInsulin = MainApp.getConstraintChecker().getMaxBolusAllowed().value();
         editInsulin = (NumberPicker) view.findViewById(R.id.overview_newextendedbolus_insulin);
         editInsulin.setParams(0d, 0d, maxInsulin, 0.1d, new DecimalFormat("0.00"), false);
 
-        double extendedDurationStep = ConfigBuilderPlugin.getPlugin().getActivePump().getPumpDescription().extendedBolusDurationStep;
-        double extendedMaxDuration = ConfigBuilderPlugin.getPlugin().getActivePump().getPumpDescription().extendedBolusMaxDuration;
+        double extendedDurationStep = ConfigBuilderPlugin.getActivePump().getPumpDescription().extendedBolusDurationStep;
+        double extendedMaxDuration = ConfigBuilderPlugin.getActivePump().getPumpDescription().extendedBolusMaxDuration;
         editDuration = (NumberPicker) view.findViewById(R.id.overview_newextendedbolus_duration);
         editDuration.setParams(extendedDurationStep, extendedDurationStep, extendedMaxDuration, extendedDurationStep, new DecimalFormat("0"), false);
 
@@ -69,13 +68,13 @@ public class NewExtendedBolusDialog extends DialogFragment implements View.OnCli
                     Double insulin = SafeParse.stringToDouble(editInsulin.getText());
                     int durationInMinutes = SafeParse.stringToInt(editDuration.getText());
 
-                    String confirmMessage = MainApp.gs(R.string.setextendedbolusquestion);
+                    String confirmMessage = getString(R.string.setextendedbolusquestion);
 
-                    Double insulinAfterConstraint = MainApp.getConstraintChecker().applyExtendedBolusConstraints(new Constraint<>(insulin)).value();
+                    Double insulinAfterConstraint = MainApp.getConstraintChecker().applyBolusConstraints(new Constraint<>(insulin)).value();
                     confirmMessage += " " + insulinAfterConstraint + " U  ";
-                    confirmMessage += MainApp.gs(R.string.duration) + " " + durationInMinutes + "min ?";
-                    if (Math.abs(insulinAfterConstraint - insulin) > 0.01d)
-                        confirmMessage += "\n" + MainApp.gs(R.string.constraintapllied);
+                    confirmMessage += getString(R.string.duration) + " " + durationInMinutes + "min ?";
+                    if (insulinAfterConstraint - insulin != 0d)
+                        confirmMessage += "\n" + getString(R.string.constraintapllied);
                     insulin = insulinAfterConstraint;
 
                     final Double finalInsulin = insulin;
@@ -83,18 +82,18 @@ public class NewExtendedBolusDialog extends DialogFragment implements View.OnCli
 
                     final Context context = getContext();
                     AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                    builder.setTitle(MainApp.gs(R.string.confirmation));
+                    builder.setTitle(context.getString(R.string.confirmation));
                     builder.setMessage(confirmMessage);
-                    builder.setPositiveButton(MainApp.gs(R.string.ok), new DialogInterface.OnClickListener() {
+                    builder.setPositiveButton(getString(R.string.ok), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
-                            ConfigBuilderPlugin.getPlugin().getCommandQueue().extendedBolus(finalInsulin, finalDurationInMinutes, new Callback() {
+                            ConfigBuilderPlugin.getCommandQueue().extendedBolus(finalInsulin, finalDurationInMinutes, new Callback() {
                                 @Override
                                 public void run() {
                                     if (!result.success) {
                                         Intent i = new Intent(MainApp.instance(), ErrorHelperActivity.class);
                                         i.putExtra("soundid", R.raw.boluserror);
                                         i.putExtra("status", result.comment);
-                                        i.putExtra("title", MainApp.gs(R.string.treatmentdeliveryerror));
+                                        i.putExtra("title", MainApp.sResources.getString(R.string.treatmentdeliveryerror));
                                         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                         MainApp.instance().startActivity(i);
                                     }
@@ -103,7 +102,7 @@ public class NewExtendedBolusDialog extends DialogFragment implements View.OnCli
                             FabricPrivacy.getInstance().logCustom(new CustomEvent("ExtendedBolus"));
                         }
                     });
-                    builder.setNegativeButton(MainApp.gs(R.string.cancel), null);
+                    builder.setNegativeButton(getString(R.string.cancel), null);
                     builder.show();
                     dismiss();
 

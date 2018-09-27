@@ -3,7 +3,7 @@ package info.nightscout.androidaps.plugins.PumpDanaRKorean.comm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 import info.nightscout.androidaps.plugins.PumpDanaR.comm.MessageBase;
 
@@ -15,12 +15,10 @@ import info.nightscout.androidaps.plugins.PumpDanaR.comm.MessageBase;
  * THIS IS BROKEN IN PUMP... SENDING ONLY 1 PROFILE
  */
 public class MsgSettingBasalProfileAll_k extends MessageBase {
-    private static Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgSettingBasalProfileAll_k.class);
 
     public MsgSettingBasalProfileAll_k() {
         SetCommand(0x3206);
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     public void handleMessage(byte[] bytes) {
@@ -51,7 +49,7 @@ public class MsgSettingBasalProfileAll_k extends MessageBase {
             }
         }
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             if (pump.basal48Enable) {
                 for (int profile = 0; profile < 4; profile++) {
                     for (int index = 0; index < 24; index++) {

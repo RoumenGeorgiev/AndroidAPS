@@ -12,8 +12,6 @@ import sugar.free.sightparser.applayer.descriptors.configuration_blocks.BRProfil
 import sugar.free.sightparser.applayer.descriptors.configuration_blocks.BRProfile5Block;
 import sugar.free.sightparser.applayer.descriptors.configuration_blocks.BRProfileBlock;
 import sugar.free.sightparser.applayer.descriptors.configuration_blocks.ConfigurationBlock;
-import sugar.free.sightparser.applayer.descriptors.configuration_blocks.FactoryMinBRAmountBlock;
-import sugar.free.sightparser.applayer.descriptors.configuration_blocks.FactoryMinBolusAmountBlock;
 import sugar.free.sightparser.applayer.descriptors.configuration_blocks.MaxBRAmountBlock;
 import sugar.free.sightparser.applayer.descriptors.configuration_blocks.MaxBolusAmountBlock;
 import sugar.free.sightparser.applayer.messages.AppLayerMessage;
@@ -104,16 +102,6 @@ public class StatusTaskRunner extends TaskRunner {
                 return readMessage;
             } else if (configurationBlock instanceof MaxBRAmountBlock) {
                 result.maximumBasalAmount = ((MaxBRAmountBlock) configurationBlock).getMaximumAmount();
-                ReadConfigurationBlockMessage readMessage = new ReadConfigurationBlockMessage();
-                readMessage.setConfigurationBlockID(FactoryMinBRAmountBlock.ID);
-                return readMessage;
-            } else if (configurationBlock instanceof FactoryMinBRAmountBlock) {
-                result.minimumBasalAmount = ((FactoryMinBRAmountBlock) configurationBlock).getMinimumAmount();
-                ReadConfigurationBlockMessage readMessage = new ReadConfigurationBlockMessage();
-                readMessage.setConfigurationBlockID(FactoryMinBolusAmountBlock.ID);
-                return readMessage;
-            } else if (configurationBlock instanceof FactoryMinBolusAmountBlock) {
-                result.minimumBolusAmount = ((FactoryMinBolusAmountBlock) configurationBlock).getMinimumAmount();
                 finish(result);
             }
         }
@@ -134,7 +122,5 @@ public class StatusTaskRunner extends TaskRunner {
         public List<BRProfileBlock.ProfileBlock> basalProfile;
         public double maximumBolusAmount;
         public double maximumBasalAmount;
-        public double minimumBolusAmount;
-        public double minimumBasalAmount;
     }
 }

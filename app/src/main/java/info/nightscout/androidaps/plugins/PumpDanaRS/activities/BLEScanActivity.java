@@ -31,6 +31,9 @@ import info.nightscout.androidaps.plugins.PumpDanaRS.events.EventDanaRSDeviceCha
 import info.nightscout.utils.SP;
 
 public class BLEScanActivity extends AppCompatActivity {
+    private static Logger log = LoggerFactory.getLogger(BLEScanActivity.class);
+
+
     private ListView listView = null;
     private ListAdapter mListAdapter = null;
     private ArrayList<BluetoothDeviceItem> mDevices = new ArrayList<>();
@@ -59,15 +62,13 @@ public class BLEScanActivity extends AppCompatActivity {
         super.onResume();
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (mBluetoothAdapter != null) {
-            mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
 
-            if (mBluetoothLeScanner == null) {
-                mBluetoothAdapter.enable();
-                mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-            }
-            startScan();
+        if (mBluetoothLeScanner == null) {
+            mBluetoothAdapter.enable();
+            mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         }
+        startScan();
     }
 
     @Override
@@ -78,13 +79,11 @@ public class BLEScanActivity extends AppCompatActivity {
     }
 
     private void startScan() {
-        if (mBluetoothLeScanner != null)
-            mBluetoothLeScanner.startScan(mBleScanCallback);
+        mBluetoothLeScanner.startScan(mBleScanCallback);
     }
 
     private void stopScan() {
-        if (mBluetoothLeScanner != null)
-            mBluetoothLeScanner.stopScan(mBleScanCallback);
+        mBluetoothLeScanner.stopScan(mBleScanCallback);
     }
 
     private void addBleDevice(BluetoothDevice device) {

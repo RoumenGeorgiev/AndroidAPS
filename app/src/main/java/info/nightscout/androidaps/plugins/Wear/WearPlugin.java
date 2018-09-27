@@ -56,7 +56,6 @@ public class WearPlugin extends PluginBase {
                 .pluginName(R.string.wear)
                 .shortName(R.string.wear_shortname)
                 .preferencesId(R.xml.pref_wear)
-                .description(R.string.description_wear)
         );
         this.ctx = ctx;
     }
@@ -100,12 +99,6 @@ public class WearPlugin extends PluginBase {
         ctx.startService(new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_OPEN_SETTINGS));
     }
 
-    void requestNotificationCancel(String actionstring) {
-        Intent intent = new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_CANCEL_NOTIFICATION);
-        intent.putExtra("actionstring", actionstring);
-        ctx.startService(intent);
-    }
-
 
     @Subscribe
     public void onStatusEvent(final EventPreferenceChange ev) {
@@ -147,7 +140,11 @@ public class WearPlugin extends PluginBase {
 
     @Subscribe
     public void onStatusEvent(final EventRefreshOverview ev) {
-        if (WatchUpdaterService.shouldReportLoopStatus(LoopPlugin.getPlugin().isEnabled(PluginType.LOOP))) {
+
+        LoopPlugin activeloop = MainApp.getConfigBuilder().getActiveLoop();
+        if (activeloop == null) return;
+
+        if (WatchUpdaterService.shouldReportLoopStatus(activeloop.isEnabled(PluginType.LOOP))) {
             sendDataToWatch(true, false, false);
         }
     }
@@ -165,7 +162,7 @@ public class WearPlugin extends PluginBase {
 
     @Subscribe
     public void onStatusEvent(final EventBolusRequested ev) {
-        String status = String.format(MainApp.gs(R.string.bolusrequested), ev.getAmount());
+        String status = String.format(MainApp.sResources.getString(R.string.bolusrequested), ev.getAmount());
         Intent intent = new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_SEND_BOLUSPROGRESS);
         intent.putExtra("progresspercent", 0);
         intent.putExtra("progressstatus", status);
@@ -179,9 +176,9 @@ public class WearPlugin extends PluginBase {
 
         String status;
         if (ev.result.success) {
-            status = MainApp.gs(R.string.success);
+            status = MainApp.sResources.getString(R.string.success);
         } else {
-            status = MainApp.gs(R.string.nosuccess);
+            status = MainApp.sResources.getString(R.string.nosuccess);
         }
         Intent intent = new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_SEND_BOLUSPROGRESS);
         intent.putExtra("progresspercent", 100);
@@ -192,15 +189,6 @@ public class WearPlugin extends PluginBase {
     public void requestActionConfirmation(String title, String message, String actionstring) {
 
         Intent intent = new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_SEND_ACTIONCONFIRMATIONREQUEST);
-        intent.putExtra("title", title);
-        intent.putExtra("message", message);
-        intent.putExtra("actionstring", actionstring);
-        ctx.startService(intent);
-    }
-
-    public void requestChangeConfirmation(String title, String message, String actionstring) {
-
-        Intent intent = new Intent(ctx, WatchUpdaterService.class).setAction(WatchUpdaterService.ACTION_SEND_CHANGECONFIRMATIONREQUEST);
         intent.putExtra("title", title);
         intent.putExtra("message", message);
         intent.putExtra("actionstring", actionstring);

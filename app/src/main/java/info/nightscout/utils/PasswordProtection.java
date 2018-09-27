@@ -37,7 +37,7 @@ public class PasswordProtection {
         alertDialogBuilder.setView(promptsView);
 
         final TextView label = (TextView) promptsView.findViewById(R.id.passwordprompt_text);
-        label.setText(MainApp.gs(stringID));
+        label.setText(MainApp.sResources.getString(stringID));
         final EditText userInput = (EditText) promptsView.findViewById(R.id.passwordprompt_pass);
 
         // set dialog message
@@ -50,7 +50,7 @@ public class PasswordProtection {
                                 if (password.equals(enteredPassword)) {
                                     if (ok != null) ok.run();
                                 } else {
-                                    ToastUtils.showToastInUiThread(context, MainApp.gs(R.string.wrongpassword));
+                                    ToastUtils.showToastInUiThread(context, MainApp.sResources.getString(R.string.wrongpassword));
                                     if (fail != null) fail.run();
                                 }
                             }

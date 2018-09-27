@@ -1,14 +1,11 @@
 package info;
 
 import android.content.Context;
-import android.content.Intent;
-import android.content.res.Resources;
 
 import com.squareup.otto.Bus;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.junit.Assert;
 import org.powermock.api.mockito.PowerMockito;
 
 import java.util.Locale;
@@ -18,20 +15,10 @@ import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.data.ConstraintChecker;
 import info.nightscout.androidaps.data.Profile;
-import info.nightscout.androidaps.data.ProfileStore;
 import info.nightscout.androidaps.db.DatabaseHelper;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
-import info.nightscout.androidaps.plugins.NSClientInternal.NSUpload;
-import info.nightscout.androidaps.plugins.Treatments.TreatmentService;
-import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
-import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPlugin;
-import info.nightscout.androidaps.plugins.PumpDanaRKorean.DanaRKoreanPlugin;
-import info.nightscout.androidaps.queue.CommandQueue;
 import info.nightscout.utils.SP;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -45,10 +32,6 @@ import static org.mockito.Mockito.when;
 public class AAPSMocker {
     private static String validProfile = "{\"dia\":\"3\",\"carbratio\":[{\"time\":\"00:00\",\"value\":\"30\"}],\"carbs_hr\":\"20\",\"delay\":\"20\",\"sens\":[{\"time\":\"00:00\",\"value\":\"100\"},{\"time\":\"2:00\",\"value\":\"110\"}],\"timezone\":\"UTC\",\"basal\":[{\"time\":\"00:00\",\"value\":\"1\"}],\"target_low\":[{\"time\":\"00:00\",\"value\":\"4\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"5\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}";
     private static Profile profile;
-    private static ProfileStore profileStore;
-    public static final String TESTPROFILENAME = "someProfile";
-
-    public static Intent intentSent = null;
 
     public static void mockStrings() {
         Locale.setDefault(new Locale("en", "US"));
@@ -97,29 +80,24 @@ public class AAPSMocker {
         when(MainApp.gs(R.string.basalprofilenotaligned)).thenReturn("Basal values not aligned to hours: %s");
         when(MainApp.gs(R.string.minago)).thenReturn("%d min ago");
         when(MainApp.gs(R.string.hoursago)).thenReturn("%.1fh ago");
-        when(MainApp.gs(R.string.careportal_profileswitch)).thenReturn("Profile Switch");
-        when(MainApp.gs(R.string.configbuilder_insulin)).thenReturn("Insulin");
-        when(MainApp.gs(R.string.bolusdelivering)).thenReturn("Delivering 0.0U");
     }
 
     public static MainApp mockMainApp() {
         PowerMockito.mockStatic(MainApp.class);
         MainApp mainApp = mock(MainApp.class);
         when(MainApp.instance()).thenReturn(mainApp);
-
         return mainApp;
     }
 
     public static void mockConfigBuilder() {
         PowerMockito.mockStatic(ConfigBuilderPlugin.class);
         ConfigBuilderPlugin configBuilderPlugin = mock(ConfigBuilderPlugin.class);
-        when(ConfigBuilderPlugin.getPlugin()).thenReturn(configBuilderPlugin);
+        when(MainApp.getConfigBuilder()).thenReturn(configBuilderPlugin);
     }
 
-    public static ConstraintChecker mockConstraintsChecker() {
+    public static void mockConstraintsChecker() {
         ConstraintChecker constraintChecker = mock(ConstraintChecker.class);
         when(MainApp.getConstraintChecker()).thenReturn(constraintChecker);
-        return constraintChecker;
     }
 
     public static void mockBus() {
@@ -134,87 +112,22 @@ public class AAPSMocker {
         when(SP.getInt(anyInt(), anyInt())).thenReturn(0);
     }
 
-    public static void mockL() {
-        PowerMockito.mockStatic(L.class);
-        when(L.isEnabled(any())).thenReturn(true);
-    }
-
-    public static void mockNSUpload(){
-        PowerMockito.mockStatic(NSUpload.class);
-    }
-
     public static void mockApplicationContext() {
-        Context mockedContext = mock(Context.class);
-        Resources mResources = mock(Resources.class);
-        when(MainApp.instance().getApplicationContext()).thenReturn(mockedContext);
-        when(mockedContext.getResources()).thenReturn(mResources);
+        Context context = mock(Context.class);
+        when(MainApp.instance().getApplicationContext()).thenReturn(context);
     }
 
-    public static DatabaseHelper mockDatabaseHelper() {
+    public static void mockDatabaseHelper() {
         DatabaseHelper databaseHelper = mock(DatabaseHelper.class);
         when(MainApp.getDbHelper()).thenReturn(databaseHelper);
-        return databaseHelper;
-    }
-
-    public static void mockCommandQueue() {
-        CommandQueue queue = mock(CommandQueue.class);
-        when(ConfigBuilderPlugin.getPlugin().getCommandQueue()).thenReturn(queue);
-    }
-
-    public static TreatmentsPlugin mockTreatmentPlugin() {
-        PowerMockito.mockStatic(TreatmentsPlugin.class);
-        TreatmentsPlugin treatmentsPlugin = PowerMockito.mock(TreatmentsPlugin.class);
-        when(TreatmentsPlugin.getPlugin()).thenReturn(treatmentsPlugin);
-        return treatmentsPlugin;
-    }
-
-    public static void mockTreatmentService() throws Exception {
-        TreatmentService treatmentService = PowerMockito.mock(TreatmentService.class);
-        PowerMockito.whenNew(TreatmentService.class).withNoArguments().thenReturn(treatmentService);
-    }
-
-    public static DanaRPlugin mockDanaRPlugin() {
-        PowerMockito.mockStatic(DanaRPlugin.class);
-        DanaRPlugin danaRPlugin = mock(DanaRPlugin.class);
-        DanaRKoreanPlugin danaRKoreanPlugin = mock(DanaRKoreanPlugin.class);
-        when(MainApp.getSpecificPlugin(DanaRPlugin.class)).thenReturn(danaRPlugin);
-        when(MainApp.getSpecificPlugin(DanaRKoreanPlugin.class)).thenReturn(danaRKoreanPlugin);
-        return danaRPlugin;
     }
 
     public static Profile getValidProfile() {
         try {
             if (profile == null)
                 profile = new Profile(new JSONObject(validProfile), Constants.MGDL);
-        } catch (JSONException ignored) {
-        }
+        } catch (JSONException ignored) {}
         return profile;
-    }
-
-    public static ProfileStore getValidProfileStore() {
-        try {
-            if (profileStore == null) {
-                JSONObject json = new JSONObject();
-                JSONObject store = new JSONObject();
-                JSONObject profile = new JSONObject(validProfile);
-
-                json.put("defaultProfile", TESTPROFILENAME);
-                json.put("store", store);
-                store.put(TESTPROFILENAME, profile);
-                profileStore = new ProfileStore(json);
-            }
-        } catch (JSONException ignored) {
-            Assert.fail("getValidProfileStore() failed");
-        }
-        return profileStore;
-    }
-
-    public static void mockProfileFunctions() {
-        PowerMockito.mockStatic(ProfileFunctions.class);
-        ProfileFunctions profileFunctions = PowerMockito.mock(ProfileFunctions.class);
-        PowerMockito.when(ProfileFunctions.getInstance()).thenReturn(profileFunctions);
-        profile = getValidProfile();
-        PowerMockito.when(ProfileFunctions.getInstance().getProfile()).thenReturn(profile);
     }
 
     private static MockedBus bus = new MockedBus();

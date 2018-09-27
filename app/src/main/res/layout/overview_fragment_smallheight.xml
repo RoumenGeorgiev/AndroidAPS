@@ -24,7 +24,7 @@
             <LinearLayout
                 android:id="@+id/overview_looplayout"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:orientation="horizontal"
                 android:paddingTop="2dp">
 
@@ -35,10 +35,7 @@
                     android:layout_marginRight="5dp"
                     android:layout_weight="1"
                     android:gravity="center_vertical|center_horizontal"
-                    android:paddingBottom="3dp"
-                    android:paddingTop="3dp"
                     android:text="Open Loop"
-
                     android:textAppearance="?android:attr/textAppearanceSmall" />
 
 
@@ -50,8 +47,6 @@
                     android:layout_marginRight="5dp"
                     android:layout_weight="1"
                     android:gravity="center_vertical|center_horizontal"
-                    android:paddingBottom="3dp"
-                    android:paddingTop="3dp"
                     android:text="Profile"
                     android:textAppearance="?android:attr/textAppearanceSmall" />
 
@@ -63,8 +58,6 @@
                     android:layout_weight="1"
                     android:gravity="center_vertical|center_horizontal"
                     android:text="TempTarget"
-                    android:paddingBottom="3dp"
-                    android:paddingTop="3dp"
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textColor="@color/mdtp_white" />
 
@@ -83,8 +76,6 @@
                     android:layout_height="match_parent"
                     android:layout_marginLeft="5dp"
                     android:layout_marginRight="5dp"
-                    android:paddingBottom="3dp"
-                    android:paddingTop="3dp"
                     android:gravity="center_vertical|center_horizontal"
                     android:text="@string/initializing"
                     android:textAppearance="?android:attr/textAppearanceSmall" />
@@ -192,99 +183,54 @@
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="@color/mdtp_white" />
 
-            <com.google.android.flexbox.FlexboxLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                xmlns:app="http://schemas.android.com/apk/res-auto"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:alignContent="center"
-                app:alignItems="center"
-                app:flexDirection="row"
-                app:flexWrap="wrap"
-                app:justifyContent="space_around">
+                android:gravity="center_horizontal"
+                android:orientation="horizontal"
+                android:paddingTop="5dp">
 
-                <LinearLayout
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/iob"
+                    android:textSize="14sp" />
+
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
-                    android:id="@+id/iob_group"
-                    android:orientation="horizontal">
+                    android:text=":" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/iob"
-                        android:textSize="14sp" />
+                <TextView
+                    android:id="@+id/overview_iob"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingLeft="5dp"
+                    android:text=""
+                    android:textSize="14sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:text=":" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="10dp"
+                    android:text="@string/cob" />
 
-                    <TextView
-                        android:id="@+id/overview_iob"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:paddingLeft="5dp"
-                        android:text=""
-                        android:textSize="14sp" />
-                </LinearLayout>
-                <LinearLayout
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
-                    android:id="@+id/cob_group"
-                    android:orientation="horizontal">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingLeft="10dp"
-                        android:text="@string/cob" />
+                    android:text=":" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:text=":" />
-
-                    <TextView
-                        android:id="@+id/overview_cob"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingLeft="5dp"
-                        android:text="" />
-                </LinearLayout>
-
-                <LinearLayout
+                <TextView
+                    android:id="@+id/overview_cob"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:id="@+id/as_group"
-                    android:orientation="horizontal">
+                    android:paddingLeft="5dp"
+                    android:text="" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingLeft="10dp"
-                        android:text="@string/as" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:text=":" />
-
-                    <TextView
-                        android:id="@+id/overview_sensitivity"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingLeft="5dp"
-                        android:text="" />
-
-                </LinearLayout>
-
-            </com.google.android.flexbox.FlexboxLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -308,13 +254,6 @@
                         android:layout_alignParentTop="true"
                         android:paddingTop="5dp"
                         app:srcCompat="@drawable/ic_arrow_drop_down_white_24dp" />
-
-                    <TextView
-                        android:id="@+id/overview_iobcalculationprogess"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_centerInParent="true"
-                        android:textSize="15sp" />
 
                 </RelativeLayout>
 

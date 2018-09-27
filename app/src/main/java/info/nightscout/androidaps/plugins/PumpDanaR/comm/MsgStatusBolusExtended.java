@@ -5,23 +5,20 @@ import android.support.annotation.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import info.nightscout.androidaps.MainApp;
+import java.util.Date;
+
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.db.ExtendedBolus;
 import info.nightscout.androidaps.db.Source;
-import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.TreatmentsInterface;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
 import info.nightscout.androidaps.plugins.Treatments.TreatmentsPlugin;
-import info.nightscout.utils.DateUtil;
 
 public class MsgStatusBolusExtended extends MessageBase {
-    private static Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(MsgStatusBolusExtended.class);
 
     public MsgStatusBolusExtended() {
         SetCommand(0x0207);
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     public void handleMessage(byte[] bytes) {
@@ -37,7 +34,7 @@ public class MsgStatusBolusExtended extends MessageBase {
 
         int extendedBolusSoFarInMinutes = extendedBolusSoFarInSecs / 60;
         double extendedBolusAbsoluteRate = isExtendedInProgress ? extendedBolusAmount / extendedBolusMinutes * 60 : 0d;
-        long extendedBolusStart = isExtendedInProgress ? getDateFromSecAgo(extendedBolusSoFarInSecs) : 0;
+        Date extendedBolusStart = isExtendedInProgress ? getDateFromSecAgo(extendedBolusSoFarInSecs) : new Date(0);
         int extendedBolusRemainingMinutes = extendedBolusMinutes - extendedBolusSoFarInMinutes;
 
         DanaRPump pump = DanaRPump.getInstance();
@@ -48,22 +45,23 @@ public class MsgStatusBolusExtended extends MessageBase {
         pump.extendedBolusAbsoluteRate = extendedBolusAbsoluteRate;
         pump.extendedBolusStart = extendedBolusStart;
         pump.extendedBolusRemainingMinutes = extendedBolusRemainingMinutes;
+
         updateExtendedBolusInDB();
 
-        if (L.isEnabled(L.PUMPCOMM)) {
+        if (Config.logDanaMessageDetail) {
             log.debug("Is extended bolus running: " + isExtendedInProgress);
             log.debug("Extended bolus min: " + extendedBolusMinutes);
             log.debug("Extended bolus amount: " + extendedBolusAmount);
             log.debug("Extended bolus so far in minutes: " + extendedBolusSoFarInMinutes);
             log.debug("Extended bolus absolute rate: " + extendedBolusAbsoluteRate);
-            log.debug("Extended bolus start: " + DateUtil.dateAndTimeFullString(extendedBolusStart));
+            log.debug("Extended bolus start: " + extendedBolusStart);
             log.debug("Extended bolus remaining minutes: " + extendedBolusRemainingMinutes);
         }
     }
 
     @NonNull
-    private long getDateFromSecAgo(int tempBasalAgoSecs) {
-        return (long) (Math.ceil(System.currentTimeMillis() / 1000d) - tempBasalAgoSecs) * 1000;
+    private Date getDateFromSecAgo(int tempBasalAgoSecs) {
+        return new Date((long) (Math.ceil(System.currentTimeMillis() / 1000d) - tempBasalAgoSecs) * 1000);
     }
 
     public static void updateExtendedBolusInDB() {
@@ -76,31 +74,31 @@ public class MsgStatusBolusExtended extends MessageBase {
             if (pump.isExtendedInProgress) {
                 if (extendedBolus.absoluteRate() != pump.extendedBolusAbsoluteRate) {
                     // Close current extended
-                    ExtendedBolus exStop = new ExtendedBolus(pump.extendedBolusStart - 1000);
+                    ExtendedBolus exStop = new ExtendedBolus(pump.extendedBolusStart.getTime() - 1000);
                     exStop.source = Source.USER;
                     treatmentsInterface.addToHistoryExtendedBolus(exStop);
                     // Create new
-                    ExtendedBolus newExtended = new ExtendedBolus()
-                            .date(pump.extendedBolusStart)
-                            .insulin(pump.extendedBolusAmount)
-                            .durationInMinutes(pump.extendedBolusMinutes)
-                            .source(Source.USER);
+                    ExtendedBolus newExtended = new ExtendedBolus();
+                    newExtended.date = pump.extendedBolusStart.getTime();
+                    newExtended.insulin = pump.extendedBolusAmount;
+                    newExtended.durationInMinutes = pump.extendedBolusMinutes;
+                    newExtended.source = Source.USER;
                     treatmentsInterface.addToHistoryExtendedBolus(newExtended);
                 }
             } else {
                 // Close curent temp basal
-                ExtendedBolus exStop = new ExtendedBolus(now)
-                        .source(Source.USER);
+                ExtendedBolus exStop = new ExtendedBolus(now);
+                exStop.source = Source.USER;
                 treatmentsInterface.addToHistoryExtendedBolus(exStop);
             }
         } else {
             if (pump.isExtendedInProgress) {
                 // Create new
-                ExtendedBolus newExtended = new ExtendedBolus()
-                        .date(pump.extendedBolusStart)
-                        .insulin(pump.extendedBolusAmount)
-                        .durationInMinutes(pump.extendedBolusMinutes)
-                        .source(Source.USER);
+                ExtendedBolus newExtended = new ExtendedBolus();
+                newExtended.date = pump.extendedBolusStart.getTime();
+                newExtended.insulin = pump.extendedBolusAmount;
+                newExtended.durationInMinutes = pump.extendedBolusMinutes;
+                newExtended.source = Source.USER;
                 treatmentsInterface.addToHistoryExtendedBolus(newExtended);
             }
         }

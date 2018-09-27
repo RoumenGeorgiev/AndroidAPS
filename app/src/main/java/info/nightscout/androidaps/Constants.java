@@ -12,7 +12,7 @@ public class Constants {
     public static final double MMOLL_TO_MGDL = 18; // 18.0182;
     public static final double MGDL_TO_MMOLL = 1 / MMOLL_TO_MGDL;
 
-    public static final double defaultDIA = 5d;
+    public static final double defaultDIA = 3d;
 
     public static final Double REALLYHIGHBASALRATE = 1111111d;
     public static final Integer REALLYHIGHPERCENTBASALRATE = 1111111;
@@ -59,7 +59,6 @@ public class Constants {
 
     //Autosens
     public static final double DEVIATION_TO_BE_EQUAL = 2.0;
-    public static final double DEFAULT_MAX_ABSORPTION_TIME = 6.0;
 
     // Pump
     public static final int PUMP_MAX_CONNECTION_TIME_IN_SECONDS = 120 - 1;
@@ -67,5 +66,4 @@ public class Constants {
 
     //SMS Communicator
     public static final long SMS_CONFIRM_TIMEOUT = T.mins(5).msecs();
-
 }

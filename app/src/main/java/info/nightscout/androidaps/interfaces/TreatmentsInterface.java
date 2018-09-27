@@ -5,7 +5,6 @@ import java.util.List;
 import info.nightscout.androidaps.data.DetailedBolusInfo;
 import info.nightscout.androidaps.data.IobTotal;
 import info.nightscout.androidaps.data.MealData;
-import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.ExtendedBolus;
 import info.nightscout.androidaps.db.ProfileSwitch;
 import info.nightscout.androidaps.db.TempTarget;
@@ -25,7 +24,7 @@ public interface TreatmentsInterface {
     IobTotal getLastCalculationTreatments();
     IobTotal getCalculationToTimeTreatments(long time);
     IobTotal getLastCalculationTempBasals();
-    IobTotal getCalculationToTimeTempBasals(long time, Profile profile);
+    IobTotal getCalculationToTimeTempBasals(long time);
 
     MealData getMealData();
 
@@ -50,12 +49,11 @@ public interface TreatmentsInterface {
 
     boolean addToHistoryExtendedBolus(ExtendedBolus extendedBolus);
 
-    boolean addToHistoryTreatment(DetailedBolusInfo detailedBolusInfo, boolean allowUpdate);
+    boolean addToHistoryTreatment(DetailedBolusInfo detailedBolusInfo);
 
     TempTarget getTempTargetFromHistory();
     TempTarget getTempTargetFromHistory(long time);
     Intervals<TempTarget> getTempTargetsFromHistory();
-    void addToHistoryTempTarget(TempTarget tempTarget);
 
     ProfileSwitch getProfileSwitchFromHistory(long time);
     ProfileIntervals<ProfileSwitch> getProfileSwitchesFromHistory();

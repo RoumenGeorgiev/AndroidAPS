@@ -2,7 +2,6 @@ package info.nightscout.androidaps.queue;
 
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 
@@ -12,11 +11,13 @@ import org.slf4j.LoggerFactory;
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
+import info.nightscout.androidaps.data.PumpEnactResult;
 import info.nightscout.androidaps.events.EventPumpStatusChanged;
 import info.nightscout.androidaps.interfaces.PumpInterface;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.Overview.events.EventDismissBolusprogressIfRunning;
+import info.nightscout.androidaps.plugins.Overview.events.EventNewNotification;
+import info.nightscout.androidaps.plugins.Overview.notifications.Notification;
 import info.nightscout.androidaps.queue.events.EventQueueChanged;
 import info.nightscout.utils.SP;
 
@@ -25,7 +26,7 @@ import info.nightscout.utils.SP;
  */
 
 public class QueueThread extends Thread {
-    private Logger log = LoggerFactory.getLogger(L.PUMPQUEUE);
+    private static Logger log = LoggerFactory.getLogger(QueueThread.class);
 
     private CommandQueue queue;
 
@@ -35,15 +36,12 @@ public class QueueThread extends Thread {
 
     private PowerManager.WakeLock mWakeLock;
 
-    QueueThread(CommandQueue queue) {
+    public QueueThread(CommandQueue queue) {
         super();
 
         this.queue = queue;
-        Context context = MainApp.instance().getApplicationContext();
-        if (context != null) {
-            PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            mWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "QueueThread");
-        }
+        PowerManager powerManager = (PowerManager) MainApp.instance().getApplicationContext().getSystemService(Context.POWER_SERVICE);
+        mWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "QueueThread");
     }
 
     @Override
@@ -54,30 +52,21 @@ public class QueueThread extends Thread {
 
         try {
             while (true) {
-                PumpInterface pump = ConfigBuilderPlugin.getPlugin().getActivePump();
-                if (pump == null) {
-                    if (L.isEnabled(L.PUMPQUEUE))
-                        log.debug("pump == null");
-                    MainApp.bus().post(new EventPumpStatusChanged(MainApp.gs(R.string.pumpNotInitialized)));
-                    SystemClock.sleep(1000);
-                    continue;
-                }
+                PumpInterface pump = ConfigBuilderPlugin.getActivePump();
                 long secondsElapsed = (System.currentTimeMillis() - connectionStartTime) / 1000;
 
                 if (!pump.isConnected() && secondsElapsed > Constants.PUMP_MAX_CONNECTION_TIME_IN_SECONDS) {
                     MainApp.bus().post(new EventDismissBolusprogressIfRunning(null));
-                    MainApp.bus().post(new EventPumpStatusChanged(MainApp.gs(R.string.connectiontimedout)));
-                    if (L.isEnabled(L.PUMPQUEUE))
-                        log.debug("timed out");
+                    MainApp.bus().post(new EventPumpStatusChanged(MainApp.sResources.getString(R.string.connectiontimedout)));
+                    log.debug("QUEUE: timed out");
                     pump.stopConnecting();
 
                     //BLUETOOTH-WATCHDOG
                     boolean watchdog = SP.getBoolean(R.string.key_btwatchdog, false);
                     long last_watchdog = SP.getLong(R.string.key_btwatchdog_lastbark, 0l);
                     watchdog = watchdog && System.currentTimeMillis() - last_watchdog > (Constants.MIN_WATCHDOG_INTERVAL_IN_SECONDS * 1000);
-                    if (watchdog) {
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("BT watchdog - toggeling the phonest bluetooth");
+                    if(watchdog) {
+                        log.debug("BT watchdog - toggeling the phonest bluetooth");
                         //write time
                         SP.putLong(R.string.key_btwatchdog_lastbark, System.currentTimeMillis());
                         //toggle BT
@@ -96,8 +85,7 @@ public class QueueThread extends Thread {
                         pump.connect("watchdog");
                     } else {
                         queue.clear();
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("no connection possible");
+                        log.debug("QUEUE: no connection possible");
                         MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.DISCONNECTING));
                         pump.disconnect("Queue empty");
                         MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.DISCONNECTED));
@@ -105,25 +93,16 @@ public class QueueThread extends Thread {
                     }
                 }
 
-                if (pump.isHandshakeInProgress()) {
-                    if (L.isEnabled(L.PUMPQUEUE))
-                        log.debug("handshaking " + secondsElapsed);
-                    MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.HANDSHAKING, (int) secondsElapsed));
-                    SystemClock.sleep(100);
-                    continue;
-                }
-
                 if (pump.isConnecting()) {
-                    if (L.isEnabled(L.PUMPQUEUE))
-                        log.debug("connecting " + secondsElapsed);
+                    log.debug("QUEUE: connecting " + secondsElapsed);
                     MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.CONNECTING, (int) secondsElapsed));
                     SystemClock.sleep(1000);
                     continue;
                 }
 
+
                 if (!pump.isConnected()) {
-                    if (L.isEnabled(L.PUMPQUEUE))
-                        log.debug("connect");
+                    log.debug("QUEUE: connect");
                     MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.CONNECTING, (int) secondsElapsed));
                     pump.connect("Connection needed");
                     SystemClock.sleep(1000);
@@ -133,14 +112,12 @@ public class QueueThread extends Thread {
                 if (queue.performing() == null) {
                     if (!connectLogged) {
                         connectLogged = true;
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("connection time " + secondsElapsed + "s");
+                        log.debug("QUEUE: connection time " + secondsElapsed + "s");
                     }
                     // Pickup 1st command and set performing variable
                     if (queue.size() > 0) {
                         queue.pickup();
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("performing " + queue.performing().status());
+                        log.debug("QUEUE: performing " + queue.performing().status());
                         MainApp.bus().post(new EventQueueChanged());
                         queue.performing().execute();
                         queue.resetPerforming();
@@ -155,25 +132,22 @@ public class QueueThread extends Thread {
                     long secondsFromLastCommand = (System.currentTimeMillis() - lastCommandTime) / 1000;
                     if (secondsFromLastCommand >= 5) {
                         waitingForDisconnect = true;
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("queue empty. disconnect");
+                        log.debug("QUEUE: queue empty. disconnect");
                         MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.DISCONNECTING));
                         pump.disconnect("Queue empty");
                         MainApp.bus().post(new EventPumpStatusChanged(EventPumpStatusChanged.DISCONNECTED));
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("disconnected");
+                        log.debug("QUEUE: disconnected");
                         return;
                     } else {
-                        if (L.isEnabled(L.PUMPQUEUE))
-                            log.debug("waiting for disconnect");
+                        log.debug("QUEUE: waiting for disconnect");
                         SystemClock.sleep(1000);
                     }
                 }
             }
         } finally {
             mWakeLock.release();
-            if (L.isEnabled(L.PUMPQUEUE))
-                log.debug("thread end");
         }
     }
+
+
 }

@@ -20,13 +20,12 @@ import org.slf4j.LoggerFactory;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.events.EventPumpStatusChanged;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.androidaps.plugins.Overview.events.EventDismissBolusprogressIfRunning;
 import info.nightscout.androidaps.plugins.Overview.events.EventOverviewBolusProgress;
 
 public class BolusProgressDialog extends DialogFragment implements View.OnClickListener {
-    private static Logger log = LoggerFactory.getLogger(L.UI);
+    private static Logger log = LoggerFactory.getLogger(BolusProgressDialog.class);
     Button stopButton;
     TextView statusView;
     TextView stopPressedView;
@@ -43,7 +42,7 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
     }
 
     public void setInsulin(double amount) {
-        BolusProgressDialog.amount = amount;
+        this.amount = amount;
         bolusEnded = false;
     }
 
@@ -54,15 +53,15 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        getDialog().setTitle(String.format(MainApp.gs(R.string.overview_bolusprogress_goingtodeliver), amount));
+        getDialog().setTitle(String.format(MainApp.sResources.getString(R.string.overview_bolusprogress_goingtodeliver), amount));
         View view = inflater.inflate(R.layout.overview_bolusprogress_dialog, container, false);
-        stopButton = view.findViewById(R.id.overview_bolusprogress_stop);
-        statusView = view.findViewById(R.id.overview_bolusprogress_status);
-        stopPressedView = view.findViewById(R.id.overview_bolusprogress_stoppressed);
-        progressBar = view.findViewById(R.id.overview_bolusprogress_progressbar);
+        stopButton = (Button) view.findViewById(R.id.overview_bolusprogress_stop);
+        statusView = (TextView) view.findViewById(R.id.overview_bolusprogress_status);
+        stopPressedView = (TextView) view.findViewById(R.id.overview_bolusprogress_stoppressed);
+        progressBar = (ProgressBar) view.findViewById(R.id.overview_bolusprogress_progressbar);
         stopButton.setOnClickListener(this);
         progressBar.setMax(100);
-        statusView.setText(MainApp.gs(R.string.waitingforpump));
+        statusView.setText(MainApp.sResources.getString(R.string.waitingforpump));
         setCancelable(false);
         stopPressed = false;
         return view;
@@ -71,35 +70,16 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
     @Override
     public void onResume() {
         super.onResume();
-        if (L.isEnabled(L.UI))
-            log.debug("onResume");
-        if (!ConfigBuilderPlugin.getPlugin().getCommandQueue().bolusInQueue()) {
-            bolusEnded = true;
-        }
-        if (bolusEnded) {
-            dismiss();
-        } else {
-            if (getDialog() != null)
-                getDialog().getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            MainApp.subscribe(this);
-            running = true;
-            if (L.isEnabled(L.UI))
-                log.debug("onResume running");
-        }
+        if (getDialog() != null)
+            getDialog().getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        MainApp.bus().register(this);
+        running = true;
+        if (bolusEnded) dismiss();
     }
 
     @Override
     public void dismiss() {
-        if (L.isEnabled(L.UI))
-            log.debug("dismiss");
-        try {
-            super.dismiss();
-        } catch (IllegalStateException e) {
-            // dialog not running yet. onResume will try again. Set bolusEnded to make extra
-            // sure onResume will catch this
-            bolusEnded = true;
-            log.error("Unhandled exception", e);
-        }
+        super.dismiss();
         if (helperActivity != null) {
             helperActivity.finish();
         }
@@ -108,22 +88,19 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
     @Override
     public void onPause() {
         super.onPause();
-        MainApp.unsubscribe(this);
+        MainApp.bus().unregister(this);
         running = false;
-        if (L.isEnabled(L.UI))
-            log.debug("onPause");
     }
 
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.overview_bolusprogress_stop:
-                if (L.isEnabled(L.UI))
-                    log.debug("Stop bolus delivery button pressed");
+                log.debug("Stop bolus delivery button pressed");
                 stopPressed = true;
                 stopPressedView.setVisibility(View.VISIBLE);
                 stopButton.setVisibility(View.INVISIBLE);
-                ConfigBuilderPlugin.getPlugin().getCommandQueue().cancelAllBoluses();
+                ConfigBuilderPlugin.getActivePump().stopBolusDelivering();
                 break;
         }
     }
@@ -132,14 +109,16 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
     public void onStatusEvent(final EventOverviewBolusProgress ev) {
         Activity activity = getActivity();
         if (activity != null) {
-            activity.runOnUiThread(() -> {
-                if (L.isEnabled(L.UI))
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
                     log.debug("Status: " + ev.status + " Percent: " + ev.percent);
-                statusView.setText(ev.status);
-                progressBar.setProgress(ev.percent);
-                if (ev.percent == 100) {
-                    stopButton.setVisibility(View.INVISIBLE);
-                    scheduleDismiss();
+                    statusView.setText(ev.status);
+                    progressBar.setProgress(ev.percent);
+                    if (ev.percent == 100) {
+                        stopButton.setVisibility(View.INVISIBLE);
+                        scheduleDismiss();
+                    }
                 }
             });
         }
@@ -147,8 +126,6 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
 
     @Subscribe
     public void onStatusEvent(final EventDismissBolusprogressIfRunning ev) {
-        if (L.isEnabled(L.UI))
-            log.debug("EventDismissBolusprogressIfRunning");
         if (BolusProgressDialog.running) {
             dismiss();
         }
@@ -156,34 +133,41 @@ public class BolusProgressDialog extends DialogFragment implements View.OnClickL
 
     @Subscribe
     public void onStatusEvent(final EventPumpStatusChanged c) {
-        if (L.isEnabled(L.UI))
-            log.debug("EventPumpStatusChanged");
+
         Activity activity = getActivity();
         if (activity != null) {
-            activity.runOnUiThread(() -> statusView.setText(c.textStatus()));
+            activity.runOnUiThread(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            statusView.setText(c.textStatus());
+                        }
+                    }
+            );
         }
+
     }
 
     private void scheduleDismiss() {
-        if (L.isEnabled(L.UI))
-            log.debug("scheduleDismiss");
-        Thread t = new Thread(() -> {
-            SystemClock.sleep(5000);
-            BolusProgressDialog.bolusEnded = true;
-            Activity activity = getActivity();
-            if (activity != null) {
-                activity.runOnUiThread(() -> {
-                    if (L.isEnabled(L.UI))
-                        log.debug("executing");
-                    try {
-                        dismiss();
-                    } catch (Exception e) {
-                        log.error("Unhandled exception", e);
-                    }
-                });
-            } else {
-                if (L.isEnabled(L.UI))
-                    log.debug("activity == null");
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SystemClock.sleep(5000);
+                BolusProgressDialog.bolusEnded = true;
+                Activity activity = getActivity();
+                if (activity != null) {
+                    activity.runOnUiThread(
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        dismiss();
+                                    } catch (Exception e) {
+                                        log.error("Unhandled exception", e);
+                                    }
+                                }
+                            });
+                }
             }
         });
         t.start();

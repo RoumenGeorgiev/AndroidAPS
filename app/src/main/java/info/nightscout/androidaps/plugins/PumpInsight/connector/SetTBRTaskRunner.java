@@ -25,15 +25,25 @@ public class SetTBRTaskRunner extends TaskRunner {
         if (message == null) return new CurrentTBRMessage();
         else if (message instanceof CurrentTBRMessage) {
             if (((CurrentTBRMessage) message).getPercentage() == 100) {
-                SetTBRMessage setTBRMessage = new SetTBRMessage();
-                setTBRMessage.setDuration(duration);
-                setTBRMessage.setAmount(amount);
-                return setTBRMessage;
+                if (amount == 100) finish(amount);
+                else {
+                    SetTBRMessage setTBRMessage = new SetTBRMessage();
+                    setTBRMessage.setDuration(duration);
+                    setTBRMessage.setAmount(amount);
+                    return setTBRMessage;
+                }
             } else {
-                ChangeTBRMessage changeTBRMessage = new ChangeTBRMessage();
-                changeTBRMessage.setDuration(duration);
-                changeTBRMessage.setAmount(amount);
-                return changeTBRMessage;
+                if (amount == 100) {
+                    ChangeTBRMessage changeTBRMessage = new ChangeTBRMessage();
+                    changeTBRMessage.setDuration(1);
+                    changeTBRMessage.setAmount(90);
+                    return changeTBRMessage;
+                } else {
+                    ChangeTBRMessage changeTBRMessage = new ChangeTBRMessage();
+                    changeTBRMessage.setDuration(duration);
+                    changeTBRMessage.setAmount(amount);
+                    return changeTBRMessage;
+                }
             }
         } else if (message instanceof SetTBRMessage) finish(amount);
         return null;

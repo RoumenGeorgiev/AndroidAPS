@@ -31,9 +31,7 @@ import info.nightscout.androidaps.data.Profile;
 import info.nightscout.androidaps.db.DanaRHistoryRecord;
 import info.nightscout.androidaps.events.EventPumpStatusChanged;
 import info.nightscout.androidaps.interfaces.PluginType;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ProfileFunctions;
 import info.nightscout.androidaps.plugins.PumpDanaR.comm.RecordTypes;
 import info.nightscout.androidaps.plugins.PumpDanaR.events.EventDanaRSyncStatus;
 import info.nightscout.androidaps.plugins.PumpDanaRKorean.DanaRKoreanPlugin;
@@ -44,9 +42,12 @@ import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.ToastUtils;
 
 public class DanaRHistoryActivity extends Activity {
-    private static Logger log = LoggerFactory.getLogger(L.PUMP);
+    private static Logger log = LoggerFactory.getLogger(DanaRHistoryActivity.class);
+
+    private boolean mBounded;
 
     private Handler mHandler;
+    private static HandlerThread mHandlerThread;
 
     static Profile profile = null;
 
@@ -64,7 +65,7 @@ public class DanaRHistoryActivity extends Activity {
         public byte type;
         String name;
 
-        TypeList(byte type, String name) {
+        public TypeList(byte type, String name) {
             this.type = type;
             this.name = name;
         }
@@ -77,7 +78,7 @@ public class DanaRHistoryActivity extends Activity {
 
     public DanaRHistoryActivity() {
         super();
-        HandlerThread mHandlerThread = new HandlerThread(DanaRHistoryActivity.class.getSimpleName());
+        mHandlerThread = new HandlerThread(DanaRHistoryActivity.class.getSimpleName());
         mHandlerThread.start();
         this.mHandler = new Handler(mHandlerThread.getLooper());
     }
@@ -115,55 +116,35 @@ public class DanaRHistoryActivity extends Activity {
 
         statusView.setVisibility(View.GONE);
 
-        boolean isKorean = DanaRKoreanPlugin.getPlugin().isEnabled(PluginType.PUMP);
-        boolean isRS = DanaRSPlugin.getPlugin().isEnabled(PluginType.PUMP);
+        boolean isKorean = MainApp.getSpecificPlugin(DanaRKoreanPlugin.class) != null && MainApp.getSpecificPlugin(DanaRKoreanPlugin.class).isEnabled(PluginType.PUMP);
+        boolean isRS = MainApp.getSpecificPlugin(DanaRSPlugin.class) != null && MainApp.getSpecificPlugin(DanaRSPlugin.class).isEnabled(PluginType.PUMP);
 
         // Types
 
         ArrayList<TypeList> typeList = new ArrayList<>();
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_ALARM, MainApp.gs(R.string.danar_history_alarm)));
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_BASALHOUR, MainApp.gs(R.string.danar_history_basalhours)));
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_BOLUS, MainApp.gs(R.string.danar_history_bolus)));
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_CARBO, MainApp.gs(R.string.danar_history_carbohydrates)));
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_DAILY, MainApp.gs(R.string.danar_history_dailyinsulin)));
-        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_GLUCOSE, MainApp.gs(R.string.danar_history_glucose)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_ALARM, getString(R.string.danar_history_alarm)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_BASALHOUR, getString(R.string.danar_history_basalhours)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_BOLUS, getString(R.string.danar_history_bolus)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_CARBO, getString(R.string.danar_history_carbohydrates)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_DAILY, getString(R.string.danar_history_dailyinsulin)));
+        typeList.add(new TypeList(RecordTypes.RECORD_TYPE_GLUCOSE, getString(R.string.danar_history_glucose)));
         if (!isKorean && !isRS) {
-            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_ERROR, MainApp.gs(R.string.danar_history_errors)));
+            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_ERROR, getString(R.string.danar_history_errors)));
         }
         if (isRS)
-            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_PRIME, MainApp.gs(R.string.danar_history_prime)));
+            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_PRIME, getString(R.string.danar_history_prime)));
         if (!isKorean) {
-            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_REFILL, MainApp.gs(R.string.danar_history_refill)));
-            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_SUSPEND, MainApp.gs(R.string.danar_history_syspend)));
+            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_REFILL, getString(R.string.danar_history_refill)));
+            typeList.add(new TypeList(RecordTypes.RECORD_TYPE_SUSPEND, getString(R.string.danar_history_syspend)));
         }
         ArrayAdapter<TypeList> spinnerAdapter = new ArrayAdapter<>(this,
                 R.layout.spinner_centered, typeList);
         historyTypeSpinner.setAdapter(spinnerAdapter);
 
-        reloadButton.setOnClickListener(v -> {
-            final TypeList selected = (TypeList) historyTypeSpinner.getSelectedItem();
-            runOnUiThread(() -> {
-                reloadButton.setVisibility(View.GONE);
-                syncButton.setVisibility(View.GONE);
-                statusView.setVisibility(View.VISIBLE);
-            });
-            clearCardView();
-            ConfigBuilderPlugin.getPlugin().getCommandQueue().loadHistory(selected.type, new Callback() {
-                @Override
-                public void run() {
-                    loadDataFromDB(selected.type);
-                    runOnUiThread(() -> {
-                        reloadButton.setVisibility(View.VISIBLE);
-                        syncButton.setVisibility(View.VISIBLE);
-                        statusView.setVisibility(View.GONE);
-                    });
-                }
-            });
-        });
-
-        syncButton.setOnClickListener(v -> mHandler.post(new Runnable() {
+        reloadButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void run() {
+            public void onClick(View v) {
+                final TypeList selected = (TypeList) historyTypeSpinner.getSelectedItem();
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -172,18 +153,52 @@ public class DanaRHistoryActivity extends Activity {
                         statusView.setVisibility(View.VISIBLE);
                     }
                 });
-                DanaRNSHistorySync sync = new DanaRNSHistorySync(historyList);
-                sync.sync(DanaRNSHistorySync.SYNC_ALL);
-                runOnUiThread(new Runnable() {
+                clearCardView();
+                ConfigBuilderPlugin.getCommandQueue().loadHistory(selected.type, new Callback() {
                     @Override
                     public void run() {
-                        reloadButton.setVisibility(View.VISIBLE);
-                        syncButton.setVisibility(View.VISIBLE);
-                        statusView.setVisibility(View.GONE);
+                        loadDataFromDB(selected.type);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                reloadButton.setVisibility(View.VISIBLE);
+                                syncButton.setVisibility(View.VISIBLE);
+                                statusView.setVisibility(View.GONE);
+                            }
+                        });
                     }
                 });
             }
-        }));
+        });
+
+        syncButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                reloadButton.setVisibility(View.GONE);
+                                syncButton.setVisibility(View.GONE);
+                                statusView.setVisibility(View.VISIBLE);
+                            }
+                        });
+                        DanaRNSHistorySync sync = new DanaRNSHistorySync(historyList);
+                        sync.sync(DanaRNSHistorySync.SYNC_ALL);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                reloadButton.setVisibility(View.VISIBLE);
+                                syncButton.setVisibility(View.VISIBLE);
+                                statusView.setVisibility(View.GONE);
+                            }
+                        });
+                    }
+                });
+            }
+        });
 
         historyTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -198,9 +213,9 @@ public class DanaRHistoryActivity extends Activity {
                 clearCardView();
             }
         });
-        profile = ProfileFunctions.getInstance().getProfile();
+        profile = MainApp.getConfigBuilder().getProfile();
         if (profile == null) {
-            ToastUtils.showToastInUiThread(MainApp.instance().getApplicationContext(), MainApp.gs(R.string.noprofile));
+            ToastUtils.showToastInUiThread(MainApp.instance().getApplicationContext(), MainApp.sResources.getString(R.string.noprofile));
             finish();
         }
     }
@@ -309,7 +324,7 @@ public class DanaRHistoryActivity extends Activity {
             super.onAttachedToRecyclerView(recyclerView);
         }
 
-        static class HistoryViewHolder extends RecyclerView.ViewHolder {
+        public static class HistoryViewHolder extends RecyclerView.ViewHolder {
             CardView cv;
             TextView time;
             TextView value;
@@ -340,26 +355,45 @@ public class DanaRHistoryActivity extends Activity {
     private void loadDataFromDB(byte type) {
         historyList = MainApp.getDbHelper().getDanaRHistoryRecordsByType(type);
 
-        runOnUiThread(() -> recyclerView.swapAdapter(new RecyclerViewAdapter(historyList), false));
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                recyclerView.swapAdapter(new RecyclerViewAdapter(historyList), false);
+            }
+        });
     }
 
     private void clearCardView() {
         historyList = new ArrayList<>();
-        runOnUiThread(() -> recyclerView.swapAdapter(new RecyclerViewAdapter(historyList), false));
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                recyclerView.swapAdapter(new RecyclerViewAdapter(historyList), false);
+            }
+        });
     }
 
     @Subscribe
     public void onStatusEvent(final EventDanaRSyncStatus s) {
-        if (L.isEnabled(L.PUMP))
-            log.debug("EventDanaRSyncStatus: " + s.message);
+        log.debug("EventDanaRSyncStatus: " + s.message);
         runOnUiThread(
-                () -> statusView.setText(s.message));
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        statusView.setText(s.message);
+                    }
+                });
     }
 
     @Subscribe
     public void onStatusEvent(final EventPumpStatusChanged s) {
         runOnUiThread(
-                () -> statusView.setText(s.textStatus())
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        statusView.setText(s.textStatus());
+                    }
+                }
         );
     }
 

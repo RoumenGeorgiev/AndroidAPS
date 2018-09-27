@@ -1,24 +1,20 @@
 package info.nightscout.androidaps.plugins.PumpDanaRS.comm;
 
-import com.cozmo.danar.util.BleCommandUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 
-import info.nightscout.androidaps.logging.L;
+import info.nightscout.androidaps.Config;
+import com.cozmo.danar.util.BleCommandUtil;
 import info.nightscout.androidaps.plugins.PumpDanaR.DanaRPump;
-import info.nightscout.utils.DateUtil;
 
 public class DanaRS_Packet_Bolus_Get_Step_Bolus_Information extends DanaRS_Packet {
-    private Logger log = LoggerFactory.getLogger(L.PUMPCOMM);
+    private static Logger log = LoggerFactory.getLogger(DanaRS_Packet_Bolus_Get_Step_Bolus_Information.class);
 
     public DanaRS_Packet_Bolus_Get_Step_Bolus_Information() {
         super();
         opCode = BleCommandUtil.DANAR_PACKET__OPCODE_BOLUS__GET_STEP_BOLUS_INFORMATION;
-        if (L.isEnabled(L.PUMPCOMM))
-            log.debug("New message");
     }
 
     @Override
@@ -37,16 +33,14 @@ public class DanaRS_Packet_Bolus_Get_Step_Bolus_Information extends DanaRS_Packe
         dataSize = 2;
         pump.initialBolusAmount = byteArrayToInt(getBytes(data, dataIndex, dataSize)) / 100d;
 
-        Date lbt = new Date(); // it doesn't provide day only hour+min, workaround: expecting today
+        pump.lastBolusTime = new Date(); // it doesn't provide day only hour+min, workaround: expecting today
         dataIndex += dataSize;
         dataSize = 1;
-        lbt.setHours(byteArrayToInt(getBytes(data, dataIndex, dataSize)));
+        pump.lastBolusTime.setHours(byteArrayToInt(getBytes(data, dataIndex, dataSize)));
 
         dataIndex += dataSize;
         dataSize = 1;
-        lbt.setMinutes(byteArrayToInt(getBytes(data, dataIndex, dataSize)));
-
-        pump.lastBolusTime = lbt.getTime();
+        pump.lastBolusTime.setMinutes(byteArrayToInt(getBytes(data, dataIndex, dataSize)));
 
         dataIndex += dataSize;
         dataSize = 2;
@@ -59,13 +53,12 @@ public class DanaRS_Packet_Bolus_Get_Step_Bolus_Information extends DanaRS_Packe
         dataIndex += dataSize;
         dataSize = 1;
         pump.bolusStep = byteArrayToInt(getBytes(data, dataIndex, dataSize)) / 100d;
-        if (error != 0)
-            failed = true;
-        if (L.isEnabled(L.PUMPCOMM)) {
+
+        if (Config.logDanaMessageDetail) {
             log.debug("Result: " + error);
             log.debug("BolusType: " + bolusType);
             log.debug("Initial bolus amount: " + pump.initialBolusAmount + " U");
-            log.debug("Last bolus time: " + DateUtil.dateAndTimeFullString(pump.lastBolusTime));
+            log.debug("Last bolus time: " + pump.lastBolusTime.toLocaleString());
             log.debug("Last bolus amount: " + pump.lastBolusAmount);
             log.debug("Max bolus: " + pump.maxBolus + " U");
             log.debug("Bolus step: " + pump.bolusStep + " U");

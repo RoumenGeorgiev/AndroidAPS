@@ -15,7 +15,6 @@ import java.util.List;
 import info.AAPSMocker;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.db.ProfileSwitch;
-import info.nightscout.androidaps.plugins.ConfigBuilder.ConfigBuilderPlugin;
 import info.nightscout.utils.DateUtil;
 import info.nightscout.utils.T;
 
@@ -24,7 +23,7 @@ import info.nightscout.utils.T;
  */
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({MainApp.class, Bus.class, ConfigBuilderPlugin.class})
+@PrepareForTest({MainApp.class, Bus.class})
 public class ProfileIntervalsTest {
     private final long startDate = DateUtil.now();
     ProfileIntervals<ProfileSwitch> list = new ProfileIntervals<>();
@@ -90,6 +89,5 @@ public class ProfileIntervalsTest {
         AAPSMocker.mockMainApp();
         AAPSMocker.mockStrings();
         AAPSMocker.mockBus();
-        AAPSMocker.mockConfigBuilder();
     }
 }

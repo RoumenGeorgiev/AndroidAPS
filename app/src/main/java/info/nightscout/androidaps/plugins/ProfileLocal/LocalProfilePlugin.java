@@ -1,6 +1,7 @@
 package info.nightscout.androidaps.plugins.ProfileLocal;
 
-import android.support.annotation.NonNull;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -8,16 +9,15 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import info.nightscout.androidaps.Config;
 import info.nightscout.androidaps.Constants;
 import info.nightscout.androidaps.MainApp;
 import info.nightscout.androidaps.R;
 import info.nightscout.androidaps.data.ProfileStore;
-import info.nightscout.androidaps.events.EventProfileStoreChanged;
 import info.nightscout.androidaps.interfaces.PluginBase;
 import info.nightscout.androidaps.interfaces.PluginDescription;
 import info.nightscout.androidaps.interfaces.PluginType;
 import info.nightscout.androidaps.interfaces.ProfileInterface;
-import info.nightscout.androidaps.logging.L;
 import info.nightscout.utils.DecimalFormatter;
 import info.nightscout.utils.SP;
 
@@ -26,7 +26,7 @@ import info.nightscout.utils.SP;
  */
 public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
     public static final String LOCAL_PROFILE = "LocalProfile";
-    private static Logger log = LoggerFactory.getLogger(L.PROFILE);
+    private static Logger log = LoggerFactory.getLogger(LocalProfilePlugin.class);
 
     private static LocalProfilePlugin localProfilePlugin;
 
@@ -40,15 +40,6 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
 
     private static final String DEFAULTARRAY = "[{\"time\":\"00:00\",\"timeAsSeconds\":0,\"value\":0}]";
 
-    public boolean isEdited() {
-        return edited;
-    }
-
-    public void setEdited(boolean edited) {
-        this.edited = edited;
-    }
-
-    boolean edited;
     boolean mgdl;
     boolean mmol;
     Double dia;
@@ -64,30 +55,30 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
                 .fragmentClass(LocalProfileFragment.class.getName())
                 .pluginName(R.string.localprofile)
                 .shortName(R.string.localprofile_shortname)
-                .description(R.string.description_profile_local)
         );
         loadSettings();
     }
 
-    public synchronized void storeSettings() {
-        SP.putBoolean(LOCAL_PROFILE + "mmol", mmol);
-        SP.putBoolean(LOCAL_PROFILE + "mgdl", mgdl);
-        SP.putString(LOCAL_PROFILE + "dia", dia.toString());
-        SP.putString(LOCAL_PROFILE + "ic", ic.toString());
-        SP.putString(LOCAL_PROFILE + "isf", isf.toString());
-        SP.putString(LOCAL_PROFILE + "basal", basal.toString());
-        SP.putString(LOCAL_PROFILE + "targetlow", targetLow.toString());
-        SP.putString(LOCAL_PROFILE + "targethigh", targetHigh.toString());
+    public void storeSettings() {
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(MainApp.instance().getApplicationContext());
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putBoolean(LOCAL_PROFILE + "mmol", mmol);
+        editor.putBoolean(LOCAL_PROFILE + "mgdl", mgdl);
+        editor.putString(LOCAL_PROFILE + "dia", dia.toString());
+        editor.putString(LOCAL_PROFILE + "ic", ic.toString());
+        editor.putString(LOCAL_PROFILE + "isf", isf.toString());
+        editor.putString(LOCAL_PROFILE + "basal", basal.toString());
+        editor.putString(LOCAL_PROFILE + "targetlow", targetLow.toString());
+        editor.putString(LOCAL_PROFILE + "targethigh", targetHigh.toString());
 
-        createAndStoreConvertedProfile();
-        edited = false;
-        if (L.isEnabled(L.PROFILE))
+        editor.apply();
+        createConvertedProfile();
+        if (Config.logPrefsChange)
             log.debug("Storing settings: " + getRawProfile().getData().toString());
-        MainApp.bus().post(new EventProfileStoreChanged());
     }
 
-    public synchronized void loadSettings() {
-        if (L.isEnabled(L.PROFILE))
+    public void loadSettings() {
+        if (Config.logPrefsChange)
             log.debug("Loading stored settings");
 
         mgdl = SP.getBoolean(LOCAL_PROFILE + "mgdl", false);
@@ -133,8 +124,6 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
             } catch (JSONException ignored) {
             }
         }
-        edited = false;
-        createAndStoreConvertedProfile();
     }
 
     /*
@@ -175,16 +164,7 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
             "created_at": "2016-06-16T08:34:41.256Z"
         }
         */
-    private void createAndStoreConvertedProfile() {
-        convertedProfile = createProfileStore();
-    }
-
-    public synchronized boolean isValidEditState() {
-        return createProfileStore().getDefaultProfile().isValid(MainApp.gs(R.string.localprofile), false);
-    }
-
-    @NonNull
-    public ProfileStore createProfileStore() {
+    private void createConvertedProfile() {
         JSONObject json = new JSONObject();
         JSONObject store = new JSONObject();
         JSONObject profile = new JSONObject();
@@ -203,17 +183,21 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
         } catch (JSONException e) {
             log.error("Unhandled exception", e);
         }
-        return new ProfileStore(json);
+        convertedProfile = new ProfileStore(json);
     }
 
     @Override
     public ProfileStore getProfile() {
+        if (convertedProfile == null)
+            createConvertedProfile();
         if (!convertedProfile.getDefaultProfile().isValid(MainApp.gs(R.string.localprofile)))
             return null;
         return convertedProfile;
     }
 
     public ProfileStore getRawProfile() {
+        if (convertedProfile == null)
+            createConvertedProfile();
         return convertedProfile;
     }
 
@@ -224,6 +208,8 @@ public class LocalProfilePlugin extends PluginBase implements ProfileInterface {
 
     @Override
     public String getProfileName() {
+        if (convertedProfile == null)
+            createConvertedProfile();
         return DecimalFormatter.to2Decimal(convertedProfile.getDefaultProfile().percentageBasalSum()) + "U ";
     }
 
